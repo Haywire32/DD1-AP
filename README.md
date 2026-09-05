@@ -46,7 +46,7 @@ Open Archipelago Launcher, select Dungeon Defenders Client, and enter the
 server and slot. The game should launch automatically. 
 Choose Play Local; online play is intentionally disabled.
 
-# Feedback or other questions
+# Feedback or questions
 I'd love feedback on design choices and bugs in the [Dungeon Defenders channel](https://discord.com/channels/731205301247803413/1328369703810240593) in the [Archipelago discord](https://discord.gg/8Z65BR2)
 
 The current version is still unstable and most likely has bugs.

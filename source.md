@@ -48,5 +48,4 @@ expect it to be a complete installed mod.
 
 No new source-code reuse license has been selected for this publication draft.
 The game's code, assets, tools, and third-party dependencies retain their own
-terms. See [the contents notes](docs/CONTENTS.md); publishing this source does not
-grant permission to redistribute those dependencies.
+terms. 

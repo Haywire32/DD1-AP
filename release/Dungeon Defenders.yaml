@@ -1,0 +1,27 @@
+# Dungeon Defenders Archipelago 0.3.1
+
+name: PlayerName
+description: Dungeon Defenders Archipelago 0.3.1
+
+game: Dungeon Defenders
+requires:
+  version: 0.6.7
+
+Dungeon Defenders:
+  # Beat a set amount of campaign maps to unlock "The Summit". Beat this level on a set difficulty to win.
+
+  # Choose the amount of levels you need to beat to unlock the final map "The Summit". Valid numbers are 1 to 11.
+  summit_required_maps: 11
+  
+  # Choose the map difficulty that is required to progress towards "The Summit" unlock. Beating higher difficulties counts for any lower ones. For example, you have to beat all 11 maps on at least medium to unlock "The Summit". Choose one: easy, medium, hard, or insane
+  summit_unlock_difficulty: medium
+  
+  # Choose the difficulty required for "The Summit" to beat the Archipelago goal. Choose one: easy, medium, hard, or insane
+  summit_goal_difficulty: hard
+  
+  progression_balancing:
+    normal: 50
+    
+  accessibility:
+    full: 50
+    minimal: 0

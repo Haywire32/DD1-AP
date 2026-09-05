@@ -1,0 +1,35 @@
+Dungeon Defenders Archipelago - version 0.3.1
+================================================
+
+This mod is for Play Local only.
+
+Requirements
+------------
+- Dungeon Defenders from Steam
+- Dungeon Defenders Development Kit from Steam
+- Archipelago 0.6.7 or newer
+
+Game install and setup
+-----------------------------------
+1. Install/update BOTH Dungeon Defenders and Dungeon Defenders Development Kit
+   in Steam.
+2. Open the install folder of both Dungeon Defenders and Dungeon Defenders Development Kit
+3. Copy all files from \Steam\steamapps\common\Dungeon Defenders into Steam\steamapps\common\DungeonDefendersDevelopmentKit. 
+   Select yes when asked to overwrite existing files.
+
+Mod installation
+---------------
+1. Double-click dungeon_defenders.apworld to install it.
+   Alternatively put the file into your \Archipelago\custom_worlds folder.
+
+2. Copy the DD1ArchipelagoCurrent folder
+   to: \Steam\steamapps\common\DungeonDefendersDevelopmentKit\TotalConversions
+   The final path is ...\TotalConversions\DD1ArchipelagoCurrent.
+3. Copy Dungeon Defenders.yaml to C:\Archipelago\Players. Edit its slot name
+   and documented options, then generate normally.
+
+Play
+----
+Open Archipelago Launcher, select Dungeon Defenders Client, and enter the
+server and slot. The game should launch automatically. 
+Choose Play Local; online play is intentionally disabled.

@@ -1,52 +1,61 @@
 # Dungeon Defenders Archipelago
+An Archipelago randomizer for Dungeon Defenders 1 on Steam.
+The mod randomizes available heroes, levels, defenses and abilities.
+The goal is to beat a set number of levels to unlock the "The Summit" and beat the boss.
+This mod is for Local play only.
 
-Source for the DD1 Archipelago 0.3.1 world, client, and Local-only Total Conversion.
+### Current location checks
+- Complete a wave
+- Complete a level. One check for each difficulty: easy, medium, hard. Harder difficulties grants checks for the lower ones.
 
-This repository is for reading, reviewing, testing, and building the integration.
-It is not a complete game installation or a replacement playtest download. It
-contains no game videos, images, compiled game packages, executables, or saves.
-The separate game-file distribution question is not resolved by publishing source.
+### Current items/rewards
+- Level access
+- The four basic heroes: Apprentice, Squire, Huntress and Monk
+- Defenses
+- Hero abilities
+- Experience points
+- Bank mana
 
-## Start here
+### Download
+[Download can be found here.](https://github.com/Haywire32/DD1-AP/releases/tag/v0.3.1)
 
-- [Client behavior and security review notes](docs/SECURITY.md): network use, installation lookup, file writes, save switching, and known review limitations.
-- [Build the Python world/client and run tests](docs/PYTHON-BUILD.md).
-- [Game source, dependencies, and build limitations](game/PATCHING.md).
-- [Contents and third-party boundaries](docs/CONTENTS.md).
-- [Validation of this source snapshot](docs/VALIDATION.md).
+# Installation guide
+### Requirements
+- Dungeon Defenders from Steam
+- Dungeon Defenders Development Kit from Steam
+- Archipelago 0.6.7 or newer
 
-## Source layout
+### Game install
+1. Install/update both Dungeon Defenders and Dungeon Defenders Development Kit
+   in Steam.
+2. Open the install folder of both Dungeon Defenders and Dungeon Defenders Development Kit
+3. Copy all files from \Steam\steamapps\common\Dungeon Defenders into Steam\steamapps\common\DungeonDefendersDevelopmentKit. 
+   Select yes when asked to overwrite existing files.
 
-| Folder | Contents |
-| --- | --- |
-| `apworld/dungeon_defenders/` | Archipelago world generation, options, items, locations, client, and public YAML exporter. |
-| `bridge/` | Event parsing, item handling, installation discovery, state/save handling, and Python tests. |
-| `game/Classes/` | Seven UnrealScript classes in the separate `DD1Archipelago` package. |
-| `release/` | The public YAML, existing 0.3.1 installation/update text, and small AP configuration overrides. |
-| `tools/` | Readable developer tools. These are not player installers and do not install game files. |
+### Mod install
+1. Double-click dungeon_defenders.apworld to install it.
+   Alternatively put the file into your \Archipelago\custom_worlds folder.
+2. Copy the DD1ArchipelagoCurrent folder
+   to: \Steam\steamapps\common\DungeonDefendersDevelopmentKit\TotalConversions
 
-The Python modules under `bridge/` are placed beside the world/client modules
-inside the built `.apworld`. They are kept separate here for testing and review.
-The game sources subclass existing DD1 classes; the old experimental patches to
-the complete base-game source are not part of this version.
+   The final path is ...\TotalConversions\DD1ArchipelagoCurrent.
+4. Copy Dungeon Defenders.yaml to C:\Archipelago\Players. Edit its slot name
+   and documented options, then generate normally.
 
-## Development status
+### Play
+Open Archipelago Launcher, select Dungeon Defenders Client, and enter the
+server and slot. The game should launch automatically. 
+Choose Play Local; online play is intentionally disabled.
 
-This is an experimental community integration, not an official Archipelago or
-Dungeon Defenders release. It targets **Play Local only**, not Ranked or online
-DD1 sessions. Runtime use requires the player's own Dungeon Defenders, DDDK,
-and a compatible Archipelago installation.
+# Feedback or questions
+I'd love feedback on design choices and bugs in the [Dungeon Defenders channel](https://discord.com/channels/731205301247803413/1328369703810240593) in the [Archipelago discord](https://discord.gg/8Z65BR2)
 
-Development has used AI assistance. The included automated tests and developer
-checks are not an independent human security audit or a certification of safety.
-The code is made browsable so reviewers can inspect it directly.
+The current version is still unstable and most likely has bugs.
 
-The historical player instructions in `release/` describe the 0.3.1 runtime
-package. This source-only repository intentionally omits that package's game
-dependencies and media. Do not copy this repository into a game installation and
-expect it to be a complete installed mod.
+### Future plans and ideas
+- Game balance adjustments
+- DLC heroes
+- More checks and rewards
 
-No new source-code reuse license has been selected for this publication draft.
-The game's code, assets, tools, and third-party dependencies retain their own
-terms. See [the contents notes](docs/CONTENTS.md); publishing this source does not
-grant permission to redistribute those dependencies.
+### Disclaimer
+AI assistance was used for reverse engineering and hook implementation. Item and logic mapping, in-game testing, verification, and design decisions were done manually by me.

@@ -37,8 +37,9 @@ This mod is for Local play only.
    Alternatively put the file into your \Archipelago\custom_worlds folder.
 2. Extract DD1ArchipelagoCurrent.zip and copy its DD1ArchipelagoCurrent folder
    to: \Steam\steamapps\common\DungeonDefendersDevelopmentKit\TotalConversions
+
    The final path is ...\TotalConversions\DD1ArchipelagoCurrent.
-3. Copy Dungeon Defenders.yaml to C:\Archipelago\Players. Edit its slot name
+4. Copy Dungeon Defenders.yaml to C:\Archipelago\Players. Edit its slot name
    and documented options, then generate normally.
 
 ### Play

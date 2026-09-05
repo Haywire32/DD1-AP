@@ -16,15 +16,18 @@
     "existing_output_protected": true,
     "source_only_inventory_passed": true,
     "independent_security_audit": false,
-    "fresh_native_rebuild_performed_for_this_snapshot": false,
+    "fresh_native_rebuild_performed_for_this_snapshot": true,
+    "fresh_pc_install_of_locally_built_dependencies_verified": false,
+    "native_rebuild_byte_identical_to_reference": false,
     "game_media_distribution_question_resolved": false
   },
   "hashed_file_count": 38,
-  "hashed_total_bytes": 194787,
+  "hashed_total_bytes": 195312,
   "notes": [
     "The manifest excludes its own hash.",
     "Checksums identify content; they do not authenticate it or certify safety.",
-    "The original and rebuilt apworld container hashes differ because ZIP metadata/compression differ; every archived file is byte-identical."
+    "The original and rebuilt apworld container hashes differ because ZIP metadata/compression differ; every archived file is byte-identical.",
+    "On 2026-09-05 all 37 UnrealScript packages were rebuilt in the existing repaired DDDK. This does not mean the native executable was rebuilt or a fresh-PC setup passed; see game/PATCHING.md."
   ],
   "files": [
     {
@@ -164,8 +167,8 @@
     },
     {
       "path": "game/PATCHING.md",
-      "bytes": 5004,
-      "sha256": "6c533960aa5e07d4afd6cefc5e07b58939a89f0280897d840ee5a98b5de99269"
+      "bytes": 5529,
+      "sha256": "e2755e71f776723e1caba7cc5e2abb070804f3964edf5c428ce13724882c297b"
     },
     {
       "path": "release/clean-config/DD1ArchipelagoUnlocks.ini",

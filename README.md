@@ -35,7 +35,7 @@ This mod is for Local play only.
 ### Mod install
 1. Double-click dungeon_defenders.apworld to install it.
    Alternatively put the file into your \Archipelago\custom_worlds folder.
-2. Extract DD1ArchipelagoCurrent.zip and copy its DD1ArchipelagoCurrent folder
+2. Copy the DD1ArchipelagoCurrent folder
    to: \Steam\steamapps\common\DungeonDefendersDevelopmentKit\TotalConversions
 
    The final path is ...\TotalConversions\DD1ArchipelagoCurrent.

@@ -26,7 +26,7 @@ This mod is for Local play only.
 - Archipelago 0.6.7 or newer
 
 # Game install
-1. Install/update BOTH Dungeon Defenders and Dungeon Defenders Development Kit
+1. Install/update both Dungeon Defenders and Dungeon Defenders Development Kit
    in Steam.
 2. Open the install folder of both Dungeon Defenders and Dungeon Defenders Development Kit
 3. Copy all files from \Steam\steamapps\common\Dungeon Defenders into Steam\steamapps\common\DungeonDefendersDevelopmentKit. 

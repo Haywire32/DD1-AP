@@ -559,14 +559,23 @@ def validate_unlock_state(value: object) -> dict[str, Any]:
     return value
 
 
-def write_unlock_ini(path: Path, value: object, *, level_six_heroes: Iterable[str] = ()) -> None:
+def write_unlock_ini(
+    path: Path,
+    value: object,
+    *,
+    level_six_heroes: Iterable[str] = (),
+    experience_multiplier: int = 1,
+) -> None:
     state = validate_unlock_state(value)
+    if isinstance(experience_multiplier, bool) or experience_multiplier not in {1, 2, 4, 6, 8, 10}:
+        raise ProtocolError("experience_multiplier must be one of 1, 2, 4, 6, 8, or 10")
     unlocked = state["unlocked"]
     lines = [
         "[DD1Archipelago.APUnlockState]",
         f"Revision={state['revision']}",
         f"Slot={state['slot']}",
         f"MaxEquipmentQuality={unlocked['max_equipment_quality']}",
+        f"ExperienceMultiplier={experience_multiplier}",
     ]
     field_names = (
         ("UnlockedHeroes", "heroes"),

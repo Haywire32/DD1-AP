@@ -8,6 +8,13 @@ var int PendingXPRewardCount;
 var int PendingManaRewardCount;
 var array<string> APMessageQueue;
 
+struct APHeroExperienceTracker
+{
+    var DunDefHero Hero;
+    var int LastExperience;
+};
+var array<APHeroExperienceTracker> APExperienceTrackers;
+
 function QueueAPMessage(string Message)
 {
     if(WorldInfo.NetMode != NM_Standalone || Message == "")
@@ -64,10 +71,12 @@ simulated event PostBeginPlay()
         RewardState = new(self) class'APRewardState';
         ApplyOwnedMapVisibility();
         ConfigureHeroOwnership();
+        SetTimer(0.10, true, 'ApplyAPExperienceMultiplier');
         `log("AP:UNLOCK_STATE revision=" $ UnlockState.Revision $ " slot=" $ UnlockState.Slot $
             " heroes=" $ UnlockState.UnlockedHeroes.Length $ " defenses=" $ UnlockState.UnlockedDefenses.Length $
             " abilities=" $ UnlockState.UnlockedAbilities.Length $ " maps=" $ UnlockState.UnlockedMaps.Length $
-            " max_quality=" $ UnlockState.MaxEquipmentQuality);
+            " max_quality=" $ UnlockState.MaxEquipmentQuality $
+            " experience_multiplier=" $ GetAPExperienceMultiplier());
         EventBridge = Spawn(class'APEventBridge');
         if(EventBridge != none)
         {
@@ -83,6 +92,111 @@ simulated event PostBeginPlay()
     {
         // The prototype must never operate in an online/networked session.
         `warn("AP:DISABLED_NON_LOCAL map=" $ WorldInfo.GetMapName());
+    }
+}
+
+function int GetAPExperienceMultiplier()
+{
+    if(UnlockState == none)
+        return 1;
+
+    switch(UnlockState.ExperienceMultiplier)
+    {
+        case 2:
+        case 4:
+        case 6:
+        case 8:
+        case 10:
+            return UnlockState.ExperienceMultiplier;
+    }
+    return 1;
+}
+
+function int FindAPExperienceTracker(DunDefHero Hero)
+{
+    local int Index;
+
+    for(Index = 0; Index < APExperienceTrackers.Length; Index++)
+    {
+        if(APExperienceTrackers[Index].Hero == Hero)
+            return Index;
+    }
+    return INDEX_NONE;
+}
+
+function SetAPExperienceBaseline(DunDefHero Hero)
+{
+    local APHeroExperienceTracker NewTracker;
+    local int Index;
+
+    if(Hero == none)
+        return;
+
+    Index = FindAPExperienceTracker(Hero);
+    if(Index == INDEX_NONE)
+    {
+        NewTracker.Hero = Hero;
+        NewTracker.LastExperience = Hero.HeroExperience;
+        APExperienceTrackers.AddItem(NewTracker);
+    }
+    else
+    {
+        APExperienceTrackers[Index].LastExperience = Hero.HeroExperience;
+    }
+}
+
+function ApplyAPExperienceMultiplier()
+{
+    local DunDefPlayerController PC;
+    local DunDefHero Hero;
+    local APHeroExperienceTracker NewTracker;
+    local int Index;
+    local int EarnedExperience;
+    local int BonusExperience;
+    local int Multiplier;
+
+    if(WorldInfo.NetMode != NM_Standalone)
+        return;
+
+    Multiplier = GetAPExperienceMultiplier();
+    foreach WorldInfo.AllControllers(class'DunDefPlayerController', PC)
+    {
+        if(!PC.IsLocalPlayerController())
+            continue;
+
+        Hero = PC.GetHero();
+        if(Hero == none)
+            continue;
+
+        Index = FindAPExperienceTracker(Hero);
+        if(Index == INDEX_NONE)
+        {
+            NewTracker.Hero = Hero;
+            NewTracker.LastExperience = Hero.HeroExperience;
+            APExperienceTrackers.AddItem(NewTracker);
+            continue;
+        }
+
+        if(Hero.HeroExperience <= APExperienceTrackers[Index].LastExperience)
+        {
+            APExperienceTrackers[Index].LastExperience = Hero.HeroExperience;
+            continue;
+        }
+
+        EarnedExperience = Hero.HeroExperience - APExperienceTrackers[Index].LastExperience;
+        if(Multiplier > 1)
+        {
+            BonusExperience = EarnedExperience * (Multiplier - 1);
+            Hero.AddExperience(BonusExperience);
+            `log("AP:EXPERIENCE_MULTIPLIED earned=" $ EarnedExperience $
+                " bonus=" $ BonusExperience $ " multiplier=" $ Multiplier $
+                " total=" $ Hero.HeroExperience);
+            if(DunDefHUD(PC.myHUD) != none)
+                DunDefHUD(PC.myHUD).NotifyExperienceChange();
+        }
+        // Record the post-multiplier total so the added XP is never multiplied
+        // again on the next timer tick.
+        APExperienceTrackers[Index].LastExperience = Hero.HeroExperience;
     }
 }
 
@@ -242,7 +356,10 @@ function ApplyPendingFillerRewards()
         // level while the player is allocating the starter/refunded points.
         if(bEarlyHero && Hero.HeroLevel < 6 &&
             Hero.HeroExperience >= Hero.GetExpRequiredForNextLevel(5))
+        {
+            SetAPExperienceBaseline(Hero);
             return;
+        }
 
         while(RewardState.AppliedXPRewards < PendingXPRewardCount)
         {
@@ -270,6 +387,8 @@ function ApplyPendingFillerRewards()
             `log("AP:FILLER_REWARDS_APPLIED xp_count=" $ RewardState.AppliedXPRewards $
                 " mana_count=" $ RewardState.AppliedManaRewards);
         }
+        if(bStarterChanged || bChanged)
+            SetAPExperienceBaseline(Hero);
         return;
     }
 }

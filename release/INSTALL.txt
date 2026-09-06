@@ -1,4 +1,4 @@
-Dungeon Defenders Archipelago - version 0.3.2
+Dungeon Defenders Archipelago - version 0.3.3
 ================================================
 
 This mod is for Play Local only.
@@ -37,6 +37,15 @@ Choose Play Local; online play is intentionally disabled.
 The client finds the Development Kit through Steam's library locations, including
 other drives. You do not need to open the editor, use Cook TC, or compile files.
 No Discord downloads or extra installer scripts are needed.
+
+Updating an existing installation
+---------------------------------
+1. Double-click the new dungeon_defenders.apworld to update the client.
+2. Merge the new DD1ArchipelagoCurrent folder over the existing folder in
+   TotalConversions and replace matching files. Do not delete the existing folder.
+
+Your existing YAML, seed, characters, unlocks and rewards are kept. You do not
+need to reinstall the game or Development Kit.
 
 The client should say "Game connected: Archipelago mod loaded." and the game
 should show its Archipelago starting-items popup. A server connection alone

@@ -9,6 +9,7 @@ var config array<string> UnlockedDefenses;
 var config array<string> UnlockedAbilities;
 var config array<string> UnlockedMaps;
 var config int MaxEquipmentQuality;
+var config int ExperienceMultiplier;
 
 function bool ContainsValue(const out array<string> Values, string Wanted)
 {
@@ -244,4 +245,5 @@ defaultproperties
     Revision=0
     Slot="Unconfigured"
     MaxEquipmentQuality=0
+    ExperienceMultiplier=1
 }

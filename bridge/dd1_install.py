@@ -75,8 +75,8 @@ def validate_dddk_install(root: Path) -> None:
         except (OSError, UnicodeError) as error:
             raise ValueError(
                 f"Cannot read the DD1 mod configuration {path}: {error}. "
-                "Merge the four configuration files from the UPDATE ZIP into the existing "
-                "mod's Config folder and replace matching files. Do not delete the existing folder."
+                "Merge DD1ArchipelagoCurrent from the latest release into the Development Kit's "
+                "TotalConversions folder and replace matching files. Do not delete the existing folder."
             ) from error
         # Unreal INIs allow repeated keys/sections, which ConfigParser rejects.
         # Read the final scalar value, matching the activation entries we ship.
@@ -95,8 +95,8 @@ def validate_dddk_install(root: Path) -> None:
             if settings.get((section.casefold(), key.casefold())) != expected.casefold():
                 raise ValueError(
                     f"The DD1 mod is not enabled in {path} ({key}). "
-                    "Merge the four configuration files from the UPDATE ZIP into the existing "
-                    "mod's Config folder and replace matching files. Do not delete the existing folder."
+                    "Merge DD1ArchipelagoCurrent from the latest release into the Development Kit's "
+                    "TotalConversions folder and replace matching files. Do not delete the existing folder."
                 )
 
 

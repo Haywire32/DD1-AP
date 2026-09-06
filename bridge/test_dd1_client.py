@@ -26,6 +26,9 @@ def load_client():
             self.finished_game = False
             self.server_locations = self.checked_locations = set()
             self.locations_checked = set()
+            self.item_names = types.SimpleNamespace(
+                lookup_in_slot=lambda item, player: "Test Item"
+            )
 
         async def disconnect(self):
             pass
@@ -59,7 +62,11 @@ class ClientPortabilityTests(unittest.IsolatedAsyncioTestCase):
     def make_context(self, root=Path("unused")):
         ctx = client.DungeonDefendersContext(None, None, root, True)
         ctx.seed_name = "portability-test"
-        ctx.slot_data = {"starting_hero": "apprentice", "starting_map": "CAMPDW"}
+        ctx.slot_data = {
+            "starting_hero": "apprentice",
+            "starting_map": "CAMPDW",
+            "experience_multiplier": 4,
+        }
         return ctx
 
     def make_writer(self):
@@ -145,6 +152,20 @@ class ClientPortabilityTests(unittest.IsolatedAsyncioTestCase):
         writer.write.assert_not_called()
         writer.close.assert_called_once()
 
+    async def test_server_sent_item_message_uses_archipelago_name(self):
+        ctx = self.make_context()
+        ctx._broadcast_item_message = AsyncMock()
+        item = types.SimpleNamespace(item=123, player=0)
+        ctx.on_package("PrintJSON", {
+            "type": "ItemSend",
+            "item": item,
+            "receiving": ctx.slot,
+        })
+        await asyncio.sleep(0)
+        ctx._broadcast_item_message.assert_awaited_once_with(
+            "You received Test Item from Archipelago"
+        )
+
     async def test_saved_reward_is_retried_after_temporary_permission_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -175,6 +196,7 @@ class ClientPortabilityTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(ctx._retry_pending_unlocks(force=True))
             self.assertFalse(ctx.unlock_write_pending)
             self.assertIn("UnlockedHeroes=squire", ctx.unlock_path.read_text())
+            self.assertIn("ExperienceMultiplier=4", ctx.unlock_path.read_text())
             self.assertEqual(attempts, 2)
 
     async def test_event_poll_cannot_overwrite_concurrently_received_items(self):

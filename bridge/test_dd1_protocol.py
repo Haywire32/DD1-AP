@@ -59,6 +59,19 @@ class ProtocolTests(unittest.TestCase):
             write_unlock_ini(path, value)
             self.assertNotIn('LevelSixHeroes=', path.read_text())
 
+    def test_experience_multiplier_is_written_and_restricted(self):
+        value = {'protocol': 1, 'revision': 1, 'slot': 'Player', 'unlocked': {
+            'heroes': [], 'defenses': [], 'abilities': [], 'maps': [],
+            'max_equipment_quality': 19}}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'unlocks.ini'
+            for multiplier in (1, 2, 4, 6, 8, 10):
+                write_unlock_ini(path, value, experience_multiplier=multiplier)
+                self.assertIn(f'ExperienceMultiplier={multiplier}', path.read_text())
+            for invalid in (0, 3, 12, True):
+                with self.assertRaises(ProtocolError):
+                    write_unlock_ini(path, value, experience_multiplier=invalid)
+
     def test_new_slot_can_baseline_old_event_files(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

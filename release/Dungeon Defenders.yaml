@@ -1,7 +1,7 @@
-# Dungeon Defenders Archipelago 0.3.2
+# Dungeon Defenders Archipelago 0.3.3
 
 name: PlayerName
-description: Dungeon Defenders Archipelago 0.3.2
+description: Dungeon Defenders Archipelago 0.3.3
 
 game: Dungeon Defenders
 requires:
@@ -18,6 +18,9 @@ Dungeon Defenders:
   
   # Choose the difficulty required for "The Summit" to beat the Archipelago goal. Choose one: easy, medium, hard, or insane
   summit_goal_difficulty: hard
+
+  # Multiplies all normal gameplay experience after DD1 applies its own bonuses. Choose 1, 2, 4, 6, 8, or 10.
+  experience_multiplier: 1
   
   progression_balancing:
     normal: 50

@@ -62,11 +62,24 @@ class SummitGoalDifficulty(SummitUnlockDifficulty):
     default = 2
 
 
+class ExperienceMultiplier(Choice):
+    """Multiply all experience earned through normal DD1 gameplay. This is applied after the game's map, difficulty, wave, and performance bonuses. Choose one: 1, 2, 4, 6, 8, or 10."""
+    display_name = "Experience Multiplier"
+    option_vanilla = 1
+    option_double = 2
+    option_quadruple = 4
+    option_sextuple = 6
+    option_octuple = 8
+    option_decuple = 10
+    default = 1
+
+
 @dataclass
 class DungeonDefendersOptions(PerGameCommonOptions):
     summit_required_maps: SummitRequiredMaps
     summit_unlock_difficulty: SummitUnlockDifficulty
     summit_goal_difficulty: SummitGoalDifficulty
+    experience_multiplier: ExperienceMultiplier
 
 
 class DungeonDefendersItem(Item):
@@ -326,6 +339,7 @@ class DungeonDefendersWorld(World):
             "summit_required_maps": self.options.summit_required_maps.value,
             "summit_unlock_difficulty": self.options.summit_unlock_difficulty.value,
             "summit_goal_difficulty": self.options.summit_goal_difficulty.value,
+            "experience_multiplier": self.options.experience_multiplier.value,
         }
 
 

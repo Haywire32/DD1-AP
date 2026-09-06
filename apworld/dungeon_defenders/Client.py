@@ -97,13 +97,15 @@ class DungeonDefendersContext(CommonContext):
         executable = self.game_executable
         starting_hero = self.slot_data.get("starting_hero", "unknown")
         starting_map = self.slot_data.get("starting_map", "unknown")
+        experience_multiplier = self.slot_data.get("experience_multiplier", 1)
         logger.warning(
-            "STARTING HERO: %s    |    STARTING MAP: %s",
+            "STARTING HERO: %s    |    STARTING MAP: %s    |    EXPERIENCE: x%s",
             str(starting_hero).replace("_", " ").title(),
             next(
                 (entry.name for entry in CAMPAIGN_MAPS if entry.tag == starting_map),
                 starting_map,
             ),
+            experience_multiplier,
         )
         # Invoke the installed game's trusted executable directly. No shell,
         # batch file, helper executable, or online game mode is involved.
@@ -164,7 +166,7 @@ class DungeonDefendersContext(CommonContext):
                     "The DD1 mod has not connected after %d seconds. "
                     "If the game is still loading, wait for loading to finish. "
                     "If the menu or game has loaded without AP restrictions, close the game "
-                    "and apply the four configuration files from the UPDATE ZIP. "
+                    "and merge DD1ArchipelagoCurrent from the latest release over your installed mod. "
                     "Archipelago items are saved in the client, but delivery to the game is unconfirmed.",
                     GAME_CONNECT_TIMEOUT,
                 )
@@ -425,6 +427,7 @@ class DungeonDefendersContext(CommonContext):
                 },
             },
             level_six_heroes=self.slot_data.get("level_six_heroes", []),
+            experience_multiplier=self.slot_data.get("experience_multiplier", 1),
         )
         self.live_snapshot = self._make_live_snapshot(
             revision, unlocked, xp_rewards, mana_rewards
@@ -512,9 +515,11 @@ class DungeonDefendersContext(CommonContext):
                 if item.player == receiver == self.slot:
                     message = f"You found {name}"
                 elif receiver == self.slot:
-                    message = f"You received {name} from {self.player_names[item.player]}"
+                    sender_name = self.player_names.get(item.player, "Archipelago")
+                    message = f"You received {name} from {sender_name}"
                 else:
-                    message = f"You sent {name} to {self.player_names[receiver]}"
+                    receiver_name = self.player_names.get(receiver, f"Player {receiver}")
+                    message = f"You sent {name} to {receiver_name}"
                 asyncio.create_task(self._broadcast_item_message(message))
         if cmd == "RoomInfo":
             seed_name = args.get("seed_name")

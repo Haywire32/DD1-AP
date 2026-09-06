@@ -10,6 +10,12 @@ from typing import Iterable, Optional
 
 DDDK_DIRECTORY = "DungeonDefendersDevelopmentKit"
 DDDK_EXECUTABLE = Path("Binaries") / "Win64" / "DunDefDevelopment.exe"
+DDDK_RUNTIME_DLLS = (
+    "wxmsw28u_core_vc_custom_64.dll",
+    "wxmsw28u_richtext_vc_custom_64.dll",
+    "wxmsw28u_vc_custom_64.dll",
+    "vorbisenc_64.dll",
+)
 DDDK_APP_ID = "216840"
 TC_DIRECTORY = "DD1ArchipelagoCurrent"
 
@@ -20,6 +26,8 @@ def validate_dddk_install(root: Path) -> None:
         DDDK_EXECUTABLE,
         Path("TotalConversions") / TC_DIRECTORY / "Script" / "DD1Archipelago.u",
         Path("TotalConversions") / TC_DIRECTORY / "Script" / "UDKGame.u",
+        Path("TotalConversions") / TC_DIRECTORY / "Script" / "Core.u",
+        Path("TotalConversions") / TC_DIRECTORY / "Script" / "Engine.u",
     )
     for relative in required_files:
         target = root / relative
@@ -35,6 +43,17 @@ def validate_dddk_install(root: Path) -> None:
                 "Merge DD1ArchipelagoCurrent from the full updated release into this "
                 "Development Kit's TotalConversions folder and replace matching files. "
                 "Do not delete the existing folder or its saves."
+            )
+
+    for filename in DDDK_RUNTIME_DLLS:
+        target = root / DDDK_EXECUTABLE.parent / filename
+        if not target.is_file() or target.stat().st_size == 0:
+            raise FileNotFoundError(
+                f"Development Kit runtime file is missing or empty: {target}. "
+                "In Steam, install/update both Dungeon Defenders and its Development Kit. "
+                "Then copy the contents of your normal Dungeon Defenders installation "
+                "into the Development Kit folder, replacing matching files as described "
+                "in the installation guide. Do not download individual DLL files from websites."
             )
 
     checks = {

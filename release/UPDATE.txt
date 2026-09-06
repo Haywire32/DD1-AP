@@ -1,0 +1,35 @@
+Dungeon Defenders Archipelago - update to 0.3.2
+==============================================
+
+Already using 0.3.0 or 0.3.1? Use DD1-Archipelago-v0.3.2-Update.zip.
+
+1. Close Dungeon Defenders and all Archipelago windows.
+2. Double-click the included dungeon_defenders.apworld to update the client.
+3. Copy the included DD1ArchipelagoCurrent folder into the Development Kit's
+   TotalConversions folder. Merge folders and replace matching files.
+   Do not delete the existing mod folder or copy fresh-start reward-state files
+   from the full release over an existing installation.
+4. Open Dungeon Defenders Client again and connect to your existing server/slot.
+
+Keep your existing YAML, seed, characters and progress. The update archive
+contains no saves or reward counters. No game or Development Kit reinstall
+is needed for an otherwise complete installation.
+
+The full 0.3.2 download no longer includes the duplicate loading movie and splash
+images. Existing copies can stay; no manual cleanup is required. The compiled
+game dependencies are still included, so players do not need to build anything.
+
+The client checks for missing game libraries before launch and preserves received
+items when a wave check arrives at the same time. There are no gameplay or YAML
+option changes.
+
+The client should report "Game connected: Archipelago mod loaded." and the game
+should show its Archipelago starting-items popup. A server connection by itself
+does not confirm that the mod loaded.
+
+To save the public YAML template with PlayerName as the example slot name,
+select Dungeon Defenders YAML in Archipelago Launcher. Archipelago's general
+Generate Template command retains its standard layout, with the same option
+descriptions and defaults.
+
+The package keeps Archipelago enabled when DDDK regenerates its settings.

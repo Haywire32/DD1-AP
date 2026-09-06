@@ -223,7 +223,14 @@ class DungeonDefendersContext(CommonContext):
             check=False,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
-        if "DunDefDevelopment.exe" in process_check.stdout:
+        if process_check.returncode != 0:
+            detail = " ".join((process_check.stderr or process_check.stdout or "no details").split())[:240]
+            raise ProtocolError(
+                "Cannot check whether Dungeon Defenders is running, so no hero save was switched. "
+                "Close any running DD1 game and try again. "
+                f"Windows reported: {detail}"
+            )
+        if "dundefdevelopment.exe" in process_check.stdout.casefold():
             marker = profiles_root / "active_profile.json"
             try:
                 active = json.loads(marker.read_text(encoding="utf-8")).get("active")
@@ -476,9 +483,10 @@ class DungeonDefendersContext(CommonContext):
             if self.state_path is not None:
                 try:
                     self._retry_pending_unlocks()
-                    processed, added = await asyncio.to_thread(
-                        process_once, self.dddk_root, self.state_path
-                    )
+                    # Keep this local read-modify-write on the same event-loop
+                    # thread as ReceivedItems. A background writer could replace
+                    # newly received items with an earlier state snapshot.
+                    processed, added = process_once(self.dddk_root, self.state_path)
                     if processed or added:
                         await self._reconcile_checks()
                 except (OSError, ProtocolError, ValueError) as error:

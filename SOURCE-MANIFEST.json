@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "project": "Dungeon Defenders Archipelago",
-  "source_version": "0.3.1",
-  "prepared_date": "2026-09-05",
+  "source_version": "0.3.2",
+  "prepared_date": "2026-09-06",
   "purpose": "Browsable source for review; not a runtime release or security certification.",
-  "reference_apworld_sha256": "c6852a8dd7143b1a6b1412ead6e64648b9e792f0071f715cf7a43da2a3190a84",
+  "reference_apworld_sha256": "2f50d1d1da1e94850da7ead51d8dd86d43e0dc4ec818afd8fe2fe5692c98034b",
   "reference_game_mod_sha256": "8826719136e95386a9969b46ea0fab2906e1971771eddb683dd5f0f89a9ca8fb",
-  "rebuilt_apworld_sha256": "b3ff24190c4ecef7edb56a6e0b5def8a99021a10d4037945f406e61d25733878",
+  "rebuilt_apworld_sha256": "2f50d1d1da1e94850da7ead51d8dd86d43e0dc4ec818afd8fe2fe5692c98034b",
   "validation": {
-    "python_tests_passed": 50,
+    "python_tests_passed": 55,
     "apworld_all_file_contents_match_reference": true,
     "production_source_matches_workspace": true,
     "unreal_source_matches_workspace": true,
@@ -16,18 +16,17 @@
     "existing_output_protected": true,
     "source_only_inventory_passed": true,
     "independent_security_audit": false,
-    "fresh_native_rebuild_performed_for_this_snapshot": true,
-    "fresh_pc_install_of_locally_built_dependencies_verified": false,
-    "native_rebuild_byte_identical_to_reference": false,
-    "game_media_distribution_question_resolved": false
+    "fresh_native_rebuild_performed_for_this_snapshot": false,
+    "fresh_pc_install_of_locally_built_dependencies_verified": false
   },
   "hashed_file_count": 38,
-  "hashed_total_bytes": 195312,
+  "hashed_total_bytes": 204352,
   "notes": [
     "The manifest excludes its own hash.",
     "Checksums identify content; they do not authenticate it or certify safety.",
-    "The original and rebuilt apworld container hashes differ because ZIP metadata/compression differ; every archived file is byte-identical.",
-    "On 2026-09-05 all 37 UnrealScript packages were rebuilt in the existing repaired DDDK. This does not mean the native executable was rebuilt or a fresh-PC setup passed; see game/PATCHING.md."
+    "The released and rebuilt apworld archives are byte-identical, including every archived file and ZIP metadata.",
+    "The seven UnrealScript source files are unchanged from 0.3.1. Historical native-rebuild results are retained in game/PATCHING.md; no new native compilation was performed for this source snapshot.",
+    "The public 0.3.2 runtime includes compiled game dependencies; local compilation is optional developer work. The project owner reports redistribution permission, which this source audit did not independently verify."
   ],
   "files": [
     {
@@ -38,7 +37,7 @@
     {
       "path": "apworld/archipelago.json",
       "bytes": 162,
-      "sha256": "c8d7bc1c8691a41440a95942c6688a3cd923d8fa83bec7ec356b30f27ed023ef"
+      "sha256": "9b2e6aef762e738e810e278e5f18c91aa1c9070f7d06f2aad7ceffdcf2928c08"
     },
     {
       "path": "apworld/dungeon_defenders/__init__.py",
@@ -47,8 +46,8 @@
     },
     {
       "path": "apworld/dungeon_defenders/Client.py",
-      "bytes": 26503,
-      "sha256": "8e2bc9144170c8494ac5e9f572a8244d07a6d47ff6fd741dd2552475dac25818"
+      "bytes": 27082,
+      "sha256": "ac6e9b396b6c2f204d98619d028aab9caa8277bc7084adff698b46a6570781d7"
     },
     {
       "path": "apworld/dungeon_defenders/items.py",
@@ -82,8 +81,8 @@
     },
     {
       "path": "bridge/dd1_install.py",
-      "bytes": 8832,
-      "sha256": "18982d8a0a0cb3f5791d360f4b3dc50916029701f81d6beddf305efc24d59a63"
+      "bytes": 9796,
+      "sha256": "ff45b2308872765d679265850672d0efd1a925565b6fb5a01cb001fd572e1312"
     },
     {
       "path": "bridge/dd1_protocol.py",
@@ -92,13 +91,13 @@
     },
     {
       "path": "bridge/test_dd1_client.py",
-      "bytes": 9426,
-      "sha256": "752e433210d58081ce6451d7219d0b1347ceb10f35d1b0fdcb433f09d80d6b69"
+      "bytes": 12881,
+      "sha256": "61458cfc6c38efdb05b46f97a35b82f6ebcc126c7cf0b61900927206d4aa8ebd"
     },
     {
       "path": "bridge/test_dd1_install.py",
-      "bytes": 6894,
-      "sha256": "1afa03fa56e57101555b6586ac7b47510950f3d0c9f0b2f160d5a3de0367fa42"
+      "bytes": 8468,
+      "sha256": "1dc116e2798c0525493d06f6a6c8b56023322c70e94b0f61852dce7508f38184"
     },
     {
       "path": "bridge/test_dd1_protocol.py",
@@ -122,13 +121,13 @@
     },
     {
       "path": "docs/PYTHON-BUILD.md",
-      "bytes": 1183,
-      "sha256": "47e8ad55e7895fdf308433f76400c5dacfcc99bb501435d2001703a5131f31f9"
+      "bytes": 1397,
+      "sha256": "25f32fb7567282dcb4bf3177054010a351aa882980622d8fafafdb6ea4c154a8"
     },
     {
       "path": "docs/SECURITY.md",
-      "bytes": 2603,
-      "sha256": "05433af04522f35c9645f9113f0af7321ceba8cc7f18e583987add28859a2922"
+      "bytes": 3033,
+      "sha256": "8ae17c8a03b7ecbfded6cc807e3cc54d01b4567539c811e7355e9286758bcbf7"
     },
     {
       "path": "game/Classes/APEventBridge.uc",
@@ -167,8 +166,8 @@
     },
     {
       "path": "game/PATCHING.md",
-      "bytes": 5529,
-      "sha256": "e2755e71f776723e1caba7cc5e2abb070804f3964edf5c428ce13724882c297b"
+      "bytes": 5984,
+      "sha256": "06a9690b3b59859cdc1a7a23a5711f1532152f139d5d7d8bd1af30f4df3a0b21"
     },
     {
       "path": "release/clean-config/DD1ArchipelagoUnlocks.ini",
@@ -198,22 +197,22 @@
     {
       "path": "release/Dungeon Defenders.yaml",
       "bytes": 985,
-      "sha256": "bf07b533d33f7f13d78c6b3d0b2e48de650a285458a7606ee206276906904d00"
+      "sha256": "27fc67da456cef93cdc13264ae5459fb89b4652c94a559c427fc5e22ee0df948"
     },
     {
       "path": "release/INSTALL.txt",
-      "bytes": 1365,
-      "sha256": "81fcec38fc440721b7c06c42acbc502ed1965c844b43c3f66aca66dedc2acbaf"
+      "bytes": 1929,
+      "sha256": "329058294dd6838bc04e2b0c951353ac28cb5dbad3534f93262f921738ba42c9"
     },
     {
       "path": "release/UPDATE.txt",
-      "bytes": 1533,
-      "sha256": "bebeb0cef960353cca72bc63c5d05912583b05005cf552ea9a9bc53cff8fd8ca"
+      "bytes": 1814,
+      "sha256": "932cdebd5facc939977662fae1f411a598bb56148136e6e7e092952e6f83d029"
     },
     {
       "path": "source.md",
-      "bytes": 1567,
-      "sha256": "f43deab659faaea286411c88e87c749d5bac2fb45987536d5e49278f983cc43b"
+      "bytes": 2091,
+      "sha256": "7407c5bcf51d907129858041e099d13ca68da72366fc95beab29249ddd96bc18"
     },
     {
       "path": "tools/build_apworld.py",

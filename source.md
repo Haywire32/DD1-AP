@@ -1,6 +1,6 @@
 # Source code
 
-This is the source for DD1 Archipelago 0.3.1. The mod is for Dungeon Defenders
+This is the source for DD1 Archipelago 0.3.2. The mod is for Dungeon Defenders
 Local play only.
 
 ## Where to look
@@ -22,14 +22,23 @@ game packages, or player saves. It is not a ready-to-play installation. The game
 and Development Kit are separate requirements, and the Python client uses
 Archipelago.
 
-Publishing this source does not settle the questions about game assets in the
-earlier playable download. No reuse license has been chosen for this source yet.
+The playable 0.3.2 download includes compiled game dependencies; players do not
+need to compile them. The project owner reports permission to distribute those
+dependencies. No reuse license has been chosen for this source yet.
+
+## Changes in 0.3.2
+
+The client now handles wave events and received items on the same event-loop
+thread, preventing a wave update from overwriting newly received items. Startup
+checks also identify missing or empty native game libraries before launching.
+The packaged defaults preserve AP activation when game settings are regenerated.
+The public download omits duplicate loading movies and splash images while
+retaining the compiled script dependencies. Gameplay and YAML options are unchanged.
 
 ## Testing
 
-The 0.3.1 source passed 50 Python tests. Its rebuilt `.apworld` contains the same
-files as the reference release, although the ZIP packaging differs. File hashes
-are listed in `SOURCE-MANIFEST.json`.
+The 0.3.2 source passed 55 Python tests. Its rebuilt `.apworld` is byte-identical
+to the reference release. File hashes are listed in `SOURCE-MANIFEST.json`.
 
 Some tests use stand-ins for Archipelago and the game. They do not replace
 playtesting. A complete rebuild of every game dependency from a fresh DDDK

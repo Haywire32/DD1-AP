@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from dd1_install import DDDK_EXECUTABLE, find_dddk_root, validate_dddk_install
+from dd1_install import DDDK_EXECUTABLE, DDDK_RUNTIME_DLLS, find_dddk_root, validate_dddk_install
 
 
 class DDDKDiscoveryTests(unittest.TestCase):
@@ -20,9 +20,11 @@ class DDDKDiscoveryTests(unittest.TestCase):
         executable = root / DDDK_EXECUTABLE
         executable.parent.mkdir(parents=True, exist_ok=True)
         executable.write_bytes(b"test executable")
+        for name in DDDK_RUNTIME_DLLS:
+            (executable.parent / name).write_bytes(b"test DLL")
         tc_root = root / "TotalConversions" / "DD1ArchipelagoCurrent"
         (tc_root / "Script").mkdir(parents=True, exist_ok=True)
-        for name in ("DD1Archipelago.u", "UDKGame.u"):
+        for name in ("DD1Archipelago.u", "UDKGame.u", "Core.u", "Engine.u"):
             (tc_root / "Script" / name).write_bytes(b"test script")
         (tc_root / "Config").mkdir(parents=True, exist_ok=True)
         for prefix in ("Default", "UDK"):
@@ -137,6 +139,31 @@ class DDDKDiscoveryTests(unittest.TestCase):
             path.write_bytes(b"")
             with self.assertRaisesRegex(FileNotFoundError, "UDKGame.u"):
                 validate_dddk_install(root)
+
+    def test_core_and_engine_are_required_before_launch(self):
+        for filename in ("Core.u", "Engine.u"):
+            with self.subTest(filename=filename), tempfile.TemporaryDirectory() as directory:
+                root = self.make_dddk(Path(directory))
+                path = root / "TotalConversions" / "DD1ArchipelagoCurrent" / "Script" / filename
+                path.unlink()
+                with self.assertRaisesRegex(FileNotFoundError, filename):
+                    validate_dddk_install(root)
+
+    def test_missing_or_empty_runtime_dll_has_local_copy_instructions(self):
+        for filename in DDDK_RUNTIME_DLLS:
+            for empty in (False, True):
+                with self.subTest(filename=filename, empty=empty), tempfile.TemporaryDirectory() as directory:
+                    root = self.make_dddk(Path(directory))
+                    path = root / DDDK_EXECUTABLE.parent / filename
+                    if empty:
+                        path.write_bytes(b"")
+                    else:
+                        path.unlink()
+                    with self.assertRaises(FileNotFoundError) as caught:
+                        validate_dddk_install(root)
+                    self.assertIn(filename, str(caught.exception))
+                    self.assertIn("normal Dungeon Defenders installation", str(caught.exception))
+                    self.assertIn("Do not download individual DLL", str(caught.exception))
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ import argparse
 import importlib
 import sys
 import tempfile
+import threading
 import types
 import unittest
 from pathlib import Path
@@ -175,6 +176,70 @@ class ClientPortabilityTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(ctx.unlock_write_pending)
             self.assertIn("UnlockedHeroes=squire", ctx.unlock_path.read_text())
             self.assertEqual(attempts, 2)
+
+    async def test_event_poll_cannot_overwrite_concurrently_received_items(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ctx = self.make_context(root)
+            ctx.state_path = root / "state.json"
+            client.atomic_write_json(ctx.state_path, client.empty_bridge_state())
+            ctx._reconcile_checks = AsyncMock()
+            packet = {"index": 0, "items": [{
+                "item": client.ITEM_NAME_TO_ID["Squire"], "location": -2, "player": 1,
+            }]}
+            loop = asyncio.get_running_loop()
+            loop_thread = threading.get_ident()
+            packet_saved = threading.Event()
+            service_globals = client.process_once.__globals__
+            original_load = service_globals["load_bridge_state"]
+
+            def receive_packet():
+                try:
+                    ctx.on_package("ReceivedItems", packet)
+                finally:
+                    packet_saved.set()
+                    ctx.exit_event.set()
+
+            def load_then_schedule_packet(path):
+                state = original_load(path)
+                loop.call_soon_threadsafe(receive_packet)
+                # Reproduce the old race deterministically if polling is ever
+                # moved back to a worker without serializing state writers.
+                # On the event-loop thread the packet runs after this save.
+                if threading.get_ident() != loop_thread:
+                    if not packet_saved.wait(2):
+                        raise AssertionError("ReceivedItems did not run during the worker poll")
+                return state
+
+            with patch.dict(service_globals, {
+                "load_bridge_state": load_then_schedule_packet,
+                "event_files": lambda directories: [root / "session.json"],
+                "read_closed_event": lambda path: {"event": "session_start"},
+            }):
+                await asyncio.wait_for(ctx._poll_game_events(), timeout=3)
+            state = client.load_bridge_state(ctx.state_path)
+            self.assertEqual(len(state["received_items"]), 1)
+            self.assertEqual(state["last_received_index"], 0)
+            self.assertIn("session.json", state["processed_files"])
+
+    async def test_failed_process_query_cannot_switch_hero_save(self):
+        ctx = self.make_context()
+        query = types.SimpleNamespace(returncode=1, stdout="", stderr="Access denied")
+        with patch.object(client.subprocess, "run", return_value=query), \
+                patch.object(client.Utils, "user_path", return_value="unused-profiles", create=True), \
+                patch.object(client, "switch_hero_profile") as switch:
+            with self.assertRaisesRegex(client.ProtocolError, "no hero save was switched"):
+                ctx._activate_seed_hero_save()
+        switch.assert_not_called()
+
+    async def test_successful_empty_process_query_allows_hero_save_switch(self):
+        ctx = self.make_context()
+        query = types.SimpleNamespace(returncode=0, stdout="No tasks are running.", stderr="")
+        with patch.object(client.subprocess, "run", return_value=query), \
+                patch.object(client.Utils, "user_path", return_value="unused-profiles", create=True), \
+                patch.object(client, "switch_hero_profile", return_value="test-key") as switch:
+            ctx._activate_seed_hero_save()
+        switch.assert_called_once()
 
     async def test_no_handshake_timeout_has_clear_game_status(self):
         ctx = self.make_context()

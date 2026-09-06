@@ -1,6 +1,12 @@
 # Building the game mod
 
-Updated 5 September 2026, for version 0.3.1.
+Updated 6 September 2026, for version 0.3.2.
+
+The playable 0.3.2 download includes compiled game dependencies. The project
+owner reports permission to distribute them. Players do not need to compile
+anything; the following local build is optional developer work. The seven AP
+source classes are unchanged from 0.3.1, and the detailed build results below
+record the 5 September 0.3.1 experiment rather than a new rebuild for 0.3.2.
 
 The seven files in [Classes](Classes) compile into `DD1Archipelago.u` using the
 Dungeon Defenders Development Kit (DDDK). They extend existing game classes;
@@ -103,17 +109,18 @@ All 36 game dependencies and the AP package compiled and saved successfully:
   setup is still needed.
 
 The earlier statement that a complete script rebuild had not succeeded is now
-out of date. A short fresh-PC installation procedure is still being tested.
+out of date. Use the public installation guide for the supported player setup.
 
-## Files in the older download
+## Files in the playable download
 
 The DLC-named `.u` files are game scripts included with the dependencies, not
 complete maps or new AP features. Several are referenced by the game's startup
 settings. The randomizer only supports the 12 original campaign maps.
 
-Tests now show a route to generate these dependencies locally and omit bundled
-game movies and images. That replacement is not a finished public release yet,
-and these tests do not establish redistribution permission.
+The 0.3.2 download retains those compiled dependencies and omits the duplicate
+loading movie and splash images. The local rebuild remains available for
+development; it is not a required installation step. The rebuild experiment
+itself does not establish redistribution permission.
 
 DDDK reverse-compilation has not been verified. These checks used the published
 source, a rebuild and file comparisons, not recovered source from the release.

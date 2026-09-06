@@ -8,6 +8,8 @@ Archipelago may do.
 The client reads Steam's registry entries and registered library folders to find
 DDDK. It does not scan entire drives or change Steam's settings. It checks the
 mod's required files and configuration, but does not authenticate those files.
+Version 0.3.2 also checks that four required native DLLs exist and are nonempty;
+this detects common incomplete installs, not every possible dependency problem.
 After connecting to a slot, it normally starts the installed
 `DunDefDevelopment.exe` with `-TOTALCONVERSION=DD1ArchipelagoCurrent`.
 
@@ -28,6 +30,11 @@ uses these files:
 - `TC/DunDefHeroes.dun` and its `.bak`: the active character save pair.
 - `DDDK/UDKGame/User` or `TC/User`: game-written check events read by the client.
 - A location you choose: the optional YAML export.
+
+Version 0.3.2 processes game events on the same event-loop thread as received
+items. This removes the previous background-writer race that could replace new
+item state with an older copy. It does not coordinate separate client processes;
+run one DD1 client at a time.
 
 Changing seed, team or slot switches the active TC character save **without a
 separate prompt**. The client keeps the outgoing profile and preserves an initial

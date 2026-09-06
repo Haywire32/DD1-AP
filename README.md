@@ -17,7 +17,7 @@ This mod is for Local play only.
 - Bank mana
 
 ### Download
-Download is currently unavailable.
+You can find the [download here](https://github.com/Haywire32/DD1-AP/releases/tag/v0.3.2)
 
 # Installation guide
 ### Requirements

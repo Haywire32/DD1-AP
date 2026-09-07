@@ -1,50 +1,16 @@
-"""Item table for the first playable Dungeon Defenders world."""
+"""Hero-dependent item catalog with permanent, append-only network IDs."""
 
 from BaseClasses import ItemClassification
+from .heroes import HEROES, HERO_BY_KEY, normalize_hero_keys
 
 
 ITEM_ID_BASE = 9_200_000_000
 
-HERO_ITEMS = {
-    "Apprentice": "apprentice",
-    "Squire": "squire",
-    "Huntress": "huntress",
-    "Monk": "monk",
-}
-
-DEFENSE_ITEMS = {
-    "Magic Blockade (Apprentice)": "apprentice.magic_blockade",
-    "Magic Missile Tower (Apprentice)": "apprentice.magic_missile_tower",
-    "Fireball Tower (Apprentice)": "apprentice.fireball_tower",
-    "Lightning Tower (Apprentice)": "apprentice.lightning_tower",
-    "Deadly Striker Tower (Apprentice)": "apprentice.deadly_striker_tower",
-    "Spike Blockade (Squire)": "squire.spike_blockade",
-    "Bouncer Blockade (Squire)": "squire.bouncer_blockade",
-    "Harpoon Turret (Squire)": "squire.harpoon_turret",
-    "Bowling Ball Turret (Squire)": "squire.bowling_ball_turret",
-    "Slice and Dice Blockade (Squire)": "squire.slice_n_dice_blockade",
-    "Proximity Mine Trap (Huntress)": "huntress.proximity_mine_trap",
-    "Gas Trap (Huntress)": "huntress.gas_trap",
-    "Inferno Trap (Huntress)": "huntress.inferno_trap",
-    "Darkness Trap (Huntress)": "huntress.darkness_trap",
-    "Ethereal Spike Trap (Huntress)": "huntress.ethereal_spike_trap",
-    "Ensnare Aura (Monk)": "monk.ensnare_aura",
-    "Electric Aura (Monk)": "monk.electric_aura",
-    "Healing Aura (Monk)": "monk.healing_aura",
-    "Strength Drain Aura (Monk)": "monk.strength_drain_aura",
-    "Enrage Aura (Monk)": "monk.enrage_aura",
-}
-
-ABILITY_ITEMS = {
-    "Overcharge (Apprentice)": "apprentice.overcharge",
-    "Mana Bomb (Apprentice)": "apprentice.mana_bomb",
-    "Blood Rage (Squire)": "squire.blood_rage",
-    "Circular Slice (Squire)": "squire.circular_slice",
-    "Invisibility (Huntress)": "huntress.invisibility",
-    "Piercing Shot (Huntress)": "huntress.piercing_shot",
-    "Tower Boost (Monk)": "monk.tower_boost",
-    "Hero Boost (Monk)": "monk.hero_boost",
-}
+HERO_ITEMS = {hero.name: hero.key for hero in HEROES}
+DEFENSE_ITEMS = {hero.item_name(tool): f"{hero.key}.{tool.key}"
+                 for hero in HEROES for tool in hero.defenses}
+ABILITY_ITEMS = {hero.item_name(tool): f"{hero.key}.{tool.key}"
+                 for hero in HEROES for tool in hero.abilities}
 
 MAP_ITEMS = {
     "The Deeper Well Map": "CAMPDW",
@@ -89,7 +55,139 @@ FILLER_ITEMS = (XP_FILLER_ITEM, MANA_FILLER_ITEM)
 # Keep the retired prototype filler in the table so its numeric ID can never
 # be reinterpreted as a real reward when an old test seed reconnects.
 LEGACY_NOTHING_ITEM = "Nothing"
-ALL_ITEM_NAMES = PROGRESSION_ITEMS + (LEGACY_NOTHING_ITEM,) + FILLER_ITEMS
+# Never reorder, insert into, or rename this published 0.3.x ID list. New
+# heroes/actions are appended after its 46 entries, including retired Nothing.
+LEGACY_ITEM_NAMES = (
+    "Apprentice", "Squire", "Huntress", "Monk",
+    "Magic Blockade (Apprentice)", "Magic Missile Tower (Apprentice)",
+    "Fireball Tower (Apprentice)", "Lightning Tower (Apprentice)",
+    "Deadly Striker Tower (Apprentice)", "Spike Blockade (Squire)",
+    "Bouncer Blockade (Squire)", "Harpoon Turret (Squire)",
+    "Bowling Ball Turret (Squire)", "Slice and Dice Blockade (Squire)",
+    "Proximity Mine Trap (Huntress)", "Gas Trap (Huntress)",
+    "Inferno Trap (Huntress)", "Darkness Trap (Huntress)",
+    "Ethereal Spike Trap (Huntress)", "Ensnare Aura (Monk)",
+    "Electric Aura (Monk)", "Healing Aura (Monk)",
+    "Strength Drain Aura (Monk)", "Enrage Aura (Monk)",
+    "Overcharge (Apprentice)", "Mana Bomb (Apprentice)",
+    "Blood Rage (Squire)", "Circular Slice (Squire)",
+    "Invisibility (Huntress)", "Piercing Shot (Huntress)",
+    "Tower Boost (Monk)", "Hero Boost (Monk)",
+    "The Deeper Well Map", "Foundries and Forges Map", "Magus Quarters Map",
+    "Alchemical Laboratory Map", "Servants Quarters Map", "Castle Armory Map",
+    "Hall of Court Map", "The Throne Room Map", "Royal Gardens Map",
+    "The Ramparts Map", "Endless Spires Map", "Nothing", "Two Hero Levels", "25,000 Bank Mana",
+)
+# Keep the 0.4.0 additions fixed too. Future items go at the END, regardless
+# of where their hero/action belongs in the presentation registry.
+V040_ITEM_NAMES = (
+    "Adept",
+    "Countess",
+    "Ranger",
+    "Initiate",
+    "Barbarian",
+    "Series EV",
+    "Summoner",
+    "Jester",
+    "Hermit",
+    "Gunwitch",
+    "Warden",
+    "Guardian",
+    "Mortar Turret (Squire)",
+    "Oil Trap (Huntress)",
+    "Magic Blockade (Adept)",
+    "Magic Missile Tower (Adept)",
+    "Fireball Tower (Adept)",
+    "Lightning Tower (Adept)",
+    "Deadly Striker Tower (Adept)",
+    "Spike Blockade (Countess)",
+    "Bouncer Blockade (Countess)",
+    "Harpoon Turret (Countess)",
+    "Bowling Ball Turret (Countess)",
+    "Slice and Dice Blockade (Countess)",
+    "Mortar Turret (Countess)",
+    "Proximity Mine Trap (Ranger)",
+    "Gas Trap (Ranger)",
+    "Inferno Trap (Ranger)",
+    "Darkness Trap (Ranger)",
+    "Ethereal Spike Trap (Ranger)",
+    "Oil Trap (Ranger)",
+    "Ensnare Aura (Initiate)",
+    "Electric Aura (Initiate)",
+    "Healing Aura (Initiate)",
+    "Strength Drain Aura (Initiate)",
+    "Enrage Aura (Initiate)",
+    "Proton Beam (Series EV)",
+    "Physical Beam (Series EV)",
+    "Reflection Beam (Series EV)",
+    "Shock Beam (Series EV)",
+    "Tower Buff Beam (Series EV)",
+    "SAM Unit (Series EV)",
+    "Archer Minion (Summoner)",
+    "Spider Minion (Summoner)",
+    "Orc Minion (Summoner)",
+    "Mage Minion (Summoner)",
+    "Warrior Minion (Summoner)",
+    "Ogre Minion (Summoner)",
+    "Jack-in-the-Box (Jester)",
+    "Party Popper (Jester)",
+    "Small Present (Jester)",
+    "Deluxe Present (Jester)",
+    "Extravagant Present (Jester)",
+    "Extra-Deluxe Present (Jester)",
+    "Seed Bomb Tower (Hermit)",
+    "Web Wall (Hermit)",
+    "Nature Pylon (Hermit)",
+    "Mushroom Spore Tower (Hermit)",
+    "Forest Golem (Hermit)",
+    "Angry Blossom (Warden)",
+    "Sludge Launcher (Warden)",
+    "Cloud Tower (Warden)",
+    "Wisp Den (Warden)",
+    "Shroom Pit (Warden)",
+    "Holy Cannon (Guardian)",
+    "Obelisk (Guardian)",
+    "Owl Nest (Guardian)",
+    "Empowering Shrine (Guardian)",
+    "Holy Bulwark (Guardian)",
+    "Shadow Step (Huntress)",
+    "Upgrade Aura (Adept)",
+    "Purity Bomb (Adept)",
+    "Call to Arms (Countess)",
+    "Joust (Countess)",
+    "Invisibility Field (Ranger)",
+    "Piercing Spreadshot (Ranger)",
+    "Remote Defense Boost (Initiate)",
+    "Enemy Drain (Initiate)",
+    "Battle Leap (Barbarian)",
+    "Battle Pound (Barbarian)",
+    "Tornado Stance (Barbarian)",
+    "Lightning Stance (Barbarian)",
+    "Siphon Stance (Barbarian)",
+    "Turtle Stance (Barbarian)",
+    "Hawk Stance (Barbarian)",
+    "Holographic Decoy (Series EV)",
+    "Proton Charge Blast (Series EV)",
+    "Phase Shift / Overlord Mode (Summoner)",
+    "Flash Heal (Summoner)",
+    "Move Tower (Jester)",
+    "Wheel O' Fortuna (Jester)",
+    "Thorn Shot (Hermit)",
+    "Nature's Gift (Hermit)",
+    "Icy Needle (Gunwitch)",
+    "Vroom Broom (Gunwitch)",
+    "Two for the Price of One (Gunwitch)",
+    "Witch's Curse (Gunwitch)",
+    "Broom Nado (Gunwitch)",
+    "Blunder Broom Buster (Gunwitch)",
+    "Wrath (Warden)",
+    "Forest's Protection (Warden)",
+    "Shield Bash (Guardian)",
+    "Divine Judgement (Guardian)",
+)
+ALL_ITEM_NAMES = LEGACY_ITEM_NAMES + V040_ITEM_NAMES
+if len(set(ALL_ITEM_NAMES)) != len(ALL_ITEM_NAMES) or set(PROGRESSION_ITEMS) - set(ALL_ITEM_NAMES):
+    raise ValueError("Every catalog item needs exactly one permanent, append-only item ID.")
 ITEM_NAME_TO_ID = {name: ITEM_ID_BASE + index for index, name in enumerate(ALL_ITEM_NAMES)}
 ITEM_CLASSIFICATIONS = {
     name: (
@@ -114,38 +212,18 @@ DEFENSE_OWNER = {
     name: unlock_key.split(".", 1)[0] for name, unlock_key in DEFENSE_ITEMS.items()
 }
 
-# Defenses that directly damage enemies without requiring another damaging
-# tower. Every seed's first-wave guarantee is selected from this set for the
-# starting hero. Spike Blockade and the other Squire defenses deal contact or
-# attack damage; control/support-only traps and auras are intentionally absent.
-DAMAGING_DEFENSES = frozenset({
-    "Magic Missile Tower (Apprentice)",
-    "Fireball Tower (Apprentice)",
-    "Lightning Tower (Apprentice)",
-    "Spike Blockade (Squire)",
-    "Bouncer Blockade (Squire)",
-    "Harpoon Turret (Squire)",
-    "Bowling Ball Turret (Squire)",
-    "Slice and Dice Blockade (Squire)",
-    "Proximity Mine Trap (Huntress)",
-    "Inferno Trap (Huntress)",
-    "Ethereal Spike Trap (Huntress)",
-    "Electric Aura (Monk)",
-})
+DAMAGING_DEFENSES = frozenset(hero.item_name(tool) for hero in HEROES
+                               for tool in hero.defenses if tool.damaging)
+ANTI_AIR_DEFENSES = frozenset(hero.item_name(tool) for hero in HEROES
+                              for tool in hero.defenses if tool.anti_air)
+GENERIC_DAMAGE_DEFENSES = frozenset(hero.item_name(tool) for hero in HEROES
+                                    for tool in hero.defenses if tool.generic_damage)
 
-# Broad anti-air-capable opening tools. For this first balance pass, "anti-air"
-# means a damaging defense with a useful attack/effect radius rather than only
-# a wall or contact attack. Huntress traps need a ground enemy to trigger but
-# can damage flying enemies within their effect, matching the intentionally
-# permissive capability rule chosen for the prototype.
-ANTI_AIR_DEFENSES = frozenset({
-    "Magic Missile Tower (Apprentice)",
-    "Fireball Tower (Apprentice)",
-    "Lightning Tower (Apprentice)",
-    "Deadly Striker Tower (Apprentice)",
-    "Harpoon Turret (Squire)",
-    "Proximity Mine Trap (Huntress)",
-    "Inferno Trap (Huntress)",
-    "Ethereal Spike Trap (Huntress)",
-    "Electric Aura (Monk)",
-})
+
+def progression_items_for_heroes(values) -> tuple[str, ...]:
+    """The selected kits only; catalog IDs remain available for old received items."""
+    selected = tuple(HERO_BY_KEY[key] for key in normalize_hero_keys(values))
+    return (tuple(hero.name for hero in selected)
+            + tuple(hero.item_name(tool) for hero in selected for tool in hero.defenses)
+            + tuple(hero.item_name(tool) for hero in selected for tool in hero.abilities)
+            + tuple(MAP_ITEMS))

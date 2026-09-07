@@ -1,4 +1,4 @@
-"""Archipelago 0.6.7 client shell for the DD1 Local-only file bridge."""
+"""Archipelago client for the regular-DD1 Local-only Total Conversion."""
 
 from __future__ import annotations
 
@@ -20,9 +20,10 @@ from CommonClient import CommonContext, get_base_parser, gui_enabled, server_loo
 from NetUtils import ClientStatus
 
 from .dd1_ap_adapter import ingest_received_packet, reconcile_locations
-from .dd1_bridge_service import baseline_existing_events, process_once
-from .dd1_install import find_dddk_root, validate_dddk_install
-from .items import ITEM_ID_TO_UNLOCK, ITEM_NAME_TO_ID, MANA_FILLER_ITEM, XP_FILLER_ITEM
+from .dd1_bridge_service import live_seed_identity, receive_live_event
+from .dd1_install import find_retail_root, validate_retail_install
+from .items import DEFENSE_ITEMS, ITEM_ID_TO_UNLOCK, ITEM_NAME_TO_ID, MANA_FILLER_ITEM, XP_FILLER_ITEM
+from .heroes import DEFAULT_HERO_KEYS, validate_roster
 from .dd1_protocol import (
     CAMPAIGN_MAPS,
     ProtocolError,
@@ -39,7 +40,7 @@ from .dd1_protocol import (
 
 
 GAME_NAME = "Dungeon Defenders"
-STATE_DATA_VERSION = 1
+STATE_DATA_VERSION = 2
 LIVE_BRIDGE_HOST = "127.0.0.1"
 LIVE_BRIDGE_PORT = 38282
 GAME_CONNECT_TIMEOUT = 60.0
@@ -62,11 +63,11 @@ class DungeonDefendersContext(CommonContext):
         self,
         server_address: Optional[str],
         password: Optional[str],
-        dddk_root: Path,
+        game_root: Path,
         launch_game: bool,
     ) -> None:
         super().__init__(server_address, password)
-        self.dddk_root = dddk_root
+        self.game_root = game_root
         self.launch_game = launch_game
         self.launched_game: Optional[subprocess.Popen] = None
         self.seed_name: Optional[str] = None
@@ -85,7 +86,7 @@ class DungeonDefendersContext(CommonContext):
 
     @property
     def game_executable(self) -> Path:
-        return self.dddk_root / "Binaries" / "Win64" / "DunDefDevelopment.exe"
+        return self.game_root / "Binaries" / "Win64" / "DunDefGame.exe"
 
     def _launch_local_game(self) -> None:
         if not self.launch_game:
@@ -93,7 +94,7 @@ class DungeonDefendersContext(CommonContext):
         if self.launched_game is not None and self.launched_game.poll() is None:
             logger.info("Dungeon Defenders is already running from this client.")
             return
-        validate_dddk_install(self.dddk_root)
+        validate_retail_install(self.game_root)
         executable = self.game_executable
         starting_hero = self.slot_data.get("starting_hero", "unknown")
         starting_map = self.slot_data.get("starting_map", "unknown")
@@ -113,6 +114,7 @@ class DungeonDefendersContext(CommonContext):
             [
                 str(executable),
                 "-TOTALCONVERSION=DD1ArchipelagoCurrent",
+                "-windowed",
             ],
             cwd=executable.parent,
             creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
@@ -136,7 +138,7 @@ class DungeonDefendersContext(CommonContext):
             return
         if self.poll_task is None or self.poll_task.done():
             self.poll_task = asyncio.create_task(
-                self._poll_game_events(), name="DD1 event-file poll"
+                self._poll_game_events(), name="DD1 durable check retries"
             )
         if self.game_watch_task is not None:
             self.game_watch_task.cancel()
@@ -182,15 +184,15 @@ class DungeonDefendersContext(CommonContext):
         if not self.seed_name:
             raise ProtocolError("server did not provide a seed name")
         slot_name = self.player_names.get(self.slot, self.auth or str(self.slot))
-        version = slot_data.get("dd1_slot_data_version", STATE_DATA_VERSION)
-        if not isinstance(version, int) or version < 0:
+        version = slot_data.get("dd1_slot_data_version", 1)
+        if isinstance(version, bool) or not isinstance(version, int) or not 0 <= version <= STATE_DATA_VERSION:
             raise ProtocolError("invalid DD1 slot-data version")
+        self._active_heroes(slot_data)
         filename = (
             f"{safe_filename(self.seed_name)}-team{self.team}-"
             f"{safe_filename(slot_name)}.json"
         )
         self.state_path = Path(Utils.user_path("dd1_archipelago", filename))
-        is_new_slot_state = not self.state_path.exists()
         state = load_bridge_state(self.state_path)
         bind_slot_identity(
             state,
@@ -200,13 +202,8 @@ class DungeonDefendersContext(CommonContext):
             slot_data_version=version,
         )
         state["summit_settings"] = summit_settings(slot_data)
-        if is_new_slot_state:
-            ignored = baseline_existing_events(self.dddk_root, state)
-            if ignored:
-                logger.info(
-                    "Ignored %d DD1 event file(s) created before this slot connected.",
-                    ignored,
-                )
+        # Retail completion events are explicitly seed-bound. Never import
+        # older, unbound DDDK event files into a regular-DD1 seed.
         atomic_write_json(self.state_path, state)
         logger.info("Using durable DD1 state: %s", self.state_path)
 
@@ -215,11 +212,12 @@ class DungeonDefendersContext(CommonContext):
             raise ProtocolError("cannot select a hero save without seed identity")
         slot_name = self.player_names.get(self.slot, self.auth or str(self.slot))
         identity = f"{self.seed_name}|team{self.team}|{slot_name}"
-        tc_root = self.dddk_root / "TotalConversions" / "DD1ArchipelagoCurrent"
-        profiles_root = Path(Utils.user_path("dd1_archipelago", "hero_saves"))
+        tc_root = self.game_root / "TotalConversions" / "DD1ArchipelagoCurrent"
+        install_key = hashlib.sha256(str(tc_root.resolve()).casefold().encode("utf-8")).hexdigest()[:16]
+        profiles_root = Path(Utils.user_path("dd1_archipelago", "retail_hero_saves", install_key))
         expected_key = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:32]
         process_check = subprocess.run(
-            ["tasklist", "/FI", "IMAGENAME eq DunDefDevelopment.exe", "/NH"],
+            ["tasklist", "/FI", "IMAGENAME eq DunDefGame.exe", "/NH"],
             capture_output=True,
             text=True,
             check=False,
@@ -232,7 +230,7 @@ class DungeonDefendersContext(CommonContext):
                 "Close any running DD1 game and try again. "
                 f"Windows reported: {detail}"
             )
-        if "dundefdevelopment.exe" in process_check.stdout.casefold():
+        if "dundefgame.exe" in process_check.stdout.casefold():
             marker = profiles_root / "active_profile.json"
             try:
                 active = json.loads(marker.read_text(encoding="utf-8")).get("active")
@@ -250,7 +248,7 @@ class DungeonDefendersContext(CommonContext):
     @property
     def unlock_path(self) -> Path:
         return (
-            self.dddk_root
+            self.game_root
             / "TotalConversions"
             / "DD1ArchipelagoCurrent"
             / "Config"
@@ -263,18 +261,41 @@ class DungeonDefendersContext(CommonContext):
         # APSTATE envelope. A dash is an explicit empty sentinel.
         return ",".join(sorted(values)) if values else "-"
 
-    def _make_live_snapshot(
-        self, revision: int, unlocked: dict[str, set[str]], xp_rewards: int, mana_rewards: int
-    ) -> str:
+    @staticmethod
+    def _active_heroes(slot_data: dict) -> tuple[str, ...]:
+        if slot_data.get("dd1_slot_data_version", 1) < 2:
+            return DEFAULT_HERO_KEYS
+        if not isinstance(slot_data.get("active_heroes"), list):
+            raise ProtocolError("This seed is missing its active hero roster.")
+        roster = validate_roster(slot_data["active_heroes"])
+        if slot_data.get("starting_hero") not in roster:
+            raise ProtocolError("The starting hero is not in this seed's active roster.")
+        early = slot_data.get("level_six_heroes", [])
+        if not isinstance(early, list) or any(hero not in roster for hero in early):
+            raise ProtocolError("The level-six heroes do not match this seed's roster.")
+        minion = slot_data.get("starting_minion")
+        if minion is not None and (
+            slot_data["starting_hero"] != "summoner" or minion not in {
+                "Archer Minion (Summoner)", "Spider Minion (Summoner)", "Orc Minion (Summoner)"
+            }
+        ):
+            raise ProtocolError("Invalid starting Summoner minion.")
+        if slot_data["starting_hero"] == "summoner" and minion is None:
+            raise ProtocolError("A starting Summoner needs its starting minion.")
+        return roster
+
+    def _live_seed_identity(self) -> str:
         if not self.seed_name:
             raise ProtocolError("cannot create live snapshot without seed identity")
         slot_name = self.player_names.get(self.slot, self.auth or str(self.slot))
-        seed_identity = safe_filename(
-            f"{self.seed_name}-team{self.team}-{slot_name}"
-        )
-        return "|".join((
-            "APSTATE3",
-            seed_identity,
+        return live_seed_identity(self.seed_name, self.team, slot_name)
+
+    def _make_live_snapshot(
+        self, revision: int, unlocked: dict[str, set[str]], xp_rewards: int, mana_rewards: int
+    ) -> str:
+        fields = (
+            "APSTATE4",
+            self._live_seed_identity(),
             str(revision),
             self._snapshot_field(unlocked["heroes"]),
             self._snapshot_field(unlocked["defenses"]),
@@ -283,7 +304,11 @@ class DungeonDefendersContext(CommonContext):
             "19",
             str(xp_rewards),
             str(mana_rewards),
-        )) + "\r\n"
+            self._snapshot_field(set(self._active_heroes(self.slot_data))),
+            str(self.slot_data.get("experience_multiplier", 1)),
+            self._snapshot_field(set(self.slot_data.get("level_six_heroes", []))),
+        )
+        return "|".join(fields) + "\r\n"
 
     async def _send_live_snapshot(self, writer: asyncio.StreamWriter) -> None:
         if self.live_snapshot is None:
@@ -313,7 +338,10 @@ class DungeonDefendersContext(CommonContext):
         connected = False
         try:
             greeting = await asyncio.wait_for(reader.readline(), GAME_HANDSHAKE_TIMEOUT)
-            if greeting.rstrip(b"\r\n") != b"DD1HELLO1":
+            if greeting.rstrip(b"\r\n") != b"DD1HELLO3":
+                if greeting.rstrip(b"\r\n") in {b"DD1HELLO1", b"DD1HELLO2"}:
+                    logger.error("The running game mod is older than this client. Install the matching 0.4.0 game files before playing this seed.")
+                    return
                 logger.warning("Ignored a localhost connection that was not the DD1 mod.")
                 return
             self.live_clients.add(writer)
@@ -323,9 +351,21 @@ class DungeonDefendersContext(CommonContext):
             await self._send_live_snapshot(writer)
             while not reader.at_eof() and not self.exit_event.is_set():
                 line = await reader.readline()
+                if not line:
+                    break
                 if line.rstrip(b"\r\n") == b"DD1PING1":
                     writer.write(b"DD1PONG1\r\n")
                     await writer.drain()
+                elif line.startswith(b"DD1EVENT1|") and self.state_path is not None:
+                    ack, changed = receive_live_event(line, self.state_path, self._live_seed_identity())
+                    if changed:
+                        self._queue_unlock_write()
+                    writer.write(ack)
+                    await writer.drain()
+                    if changed:
+                        await self._reconcile_checks()
+        except ProtocolError as error:
+            logger.error("DD1 game link rejected: %s", error)
         except (ConnectionError, OSError, asyncio.TimeoutError, ValueError):
             pass
         finally:
@@ -387,6 +427,7 @@ class DungeonDefendersContext(CommonContext):
         if self.state_path is None:
             return
         state = load_bridge_state(self.state_path)
+        active_heroes = self._active_heroes(self.slot_data)
         unlocked: dict[str, set[str]] = {
             "heroes": set(), "defenses": set(), "abilities": set(), "maps": set(),
         }
@@ -396,11 +437,16 @@ class DungeonDefendersContext(CommonContext):
             unlocked["heroes"].add(starting_hero)
         if isinstance(starting_map, str):
             unlocked["maps"].add(starting_map)
+        starting_minion = self.slot_data.get("starting_minion")
+        if starting_minion is not None:
+            unlocked["defenses"].add(DEFENSE_ITEMS[starting_minion])
         for received in state["received_items"]:
             mapping = ITEM_ID_TO_UNLOCK.get(received["item_id"])
             if mapping is not None:
                 category, key = mapping
-                unlocked[category].add(key)
+                owner = key if category == "heroes" else key.split(".")[0]
+                if category == "maps" or owner in active_heroes:
+                    unlocked[category].add(key)
         xp_rewards = sum(
             received["item_id"] == ITEM_NAME_TO_ID[XP_FILLER_ITEM]
             for received in state["received_items"]
@@ -414,7 +460,9 @@ class DungeonDefendersContext(CommonContext):
         if summit_is_unlocked(victories, settings["summit_required_maps"], settings["summit_unlock_difficulty"]):
             unlocked["maps"].add("CAMPTS")
         slot_name = self.player_names.get(self.slot, self.auth or str(self.slot))
-        revision = state["last_received_index"] + 2
+        # A map clear can unlock The Summit even when its AP item is sent to
+        # somebody else. Such local progress must refresh the game on its own.
+        revision = state["last_received_index"] + 2 + len(victories)
         write_unlock_ini(
             self.unlock_path,
             {
@@ -428,6 +476,8 @@ class DungeonDefendersContext(CommonContext):
             },
             level_six_heroes=self.slot_data.get("level_six_heroes", []),
             experience_multiplier=self.slot_data.get("experience_multiplier", 1),
+            active_heroes=active_heroes,
+            seed_identity=self._live_seed_identity(),
         )
         self.live_snapshot = self._make_live_snapshot(
             revision, unlocked, xp_rewards, mana_rewards
@@ -482,16 +532,17 @@ class DungeonDefendersContext(CommonContext):
         await self._report_goal_if_complete()
 
     async def _poll_game_events(self) -> None:
+        next_check_retry = 0.0
         while not self.exit_event.is_set():
             if self.state_path is not None:
                 try:
                     self._retry_pending_unlocks()
-                    # Keep this local read-modify-write on the same event-loop
-                    # thread as ReceivedItems. A background writer could replace
-                    # newly received items with an earlier state snapshot.
-                    processed, added = process_once(self.dddk_root, self.state_path)
-                    if processed or added:
-                        await self._reconcile_checks()
+                    # ACK means recorded locally, not acknowledged by the AP
+                    # server. Keep retrying pending checks after interruptions.
+                    if time.monotonic() >= next_check_retry:
+                        next_check_retry = time.monotonic() + 2.0
+                        if load_bridge_state(self.state_path)["pending_location_ids"]:
+                            await self._reconcile_checks()
                 except (OSError, ProtocolError, ValueError) as error:
                     logger.error("DD1 bridge poll failed: %s", error)
             await asyncio.sleep(0.25)
@@ -529,7 +580,7 @@ class DungeonDefendersContext(CommonContext):
             try:
                 # Never create a save/profile or unlock INI in an incomplete
                 # installation: that used to make a missing mod look installed.
-                validate_dddk_install(self.dddk_root)
+                validate_retail_install(self.game_root)
                 self.slot_data = args.get("slot_data") or {}
                 self._select_slot_state(self.slot_data)
                 self._activate_seed_hero_save()
@@ -538,7 +589,7 @@ class DungeonDefendersContext(CommonContext):
                 logger.error("Cannot initialize DD1 slot state: %s", error)
                 asyncio.create_task(self.disconnect())
                 return
-            logger.info("Using DD1 mod installation: %s", self.dddk_root)
+            logger.info("Using regular DD1 mod installation: %s", self.game_root)
             self.game_connected_once = bool(self.live_clients)
             if self.startup_task is not None and not self.startup_task.done():
                 self.startup_task.cancel()
@@ -589,7 +640,7 @@ class DungeonDefendersContext(CommonContext):
 
 async def _main(args: argparse.Namespace) -> None:
     ctx = DungeonDefendersContext(
-        args.connect, args.password, args.dddk_root, args.launch_game
+        args.connect, args.password, args.game_root, args.launch_game
     )
     ctx.auth = args.name
     ctx.server_task = asyncio.create_task(server_loop(ctx), name="server loop")
@@ -606,10 +657,10 @@ def launch(*launch_args: str) -> None:
     )
     parser.add_argument("--name", default=None, help="Archipelago slot name.")
     parser.add_argument(
-        "--dddk-root",
+        "--game-root",
         type=Path,
         default=None,
-        help="Optional Dungeon Defenders Development Kit folder override.",
+        help="Optional regular Dungeon Defenders installation folder override.",
     )
     parser.add_argument(
         "--no-launch-game",
@@ -622,7 +673,7 @@ def launch(*launch_args: str) -> None:
     args = parser.parse_args(launch_args)
     args = CommonClient.handle_url_arg(args, parser=parser)
     try:
-        args.dddk_root = find_dddk_root(args.dddk_root)
+        args.game_root = find_retail_root(args.game_root)
     except (OSError, ValueError) as error:
         if gui_enabled:
             try:

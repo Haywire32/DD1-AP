@@ -1,7 +1,10 @@
-class APEventBridge extends Info;
+class APEventBridge extends Info config(DD1ArchipelagoBridgeDiagnostics);
 
-var private int EventSequence;
+// FileWriter.OpenFile fails in retail. Keep checks in config until the client has
+// durably recorded them; pending entries survive disconnects and map travel.
+var config array<string> PendingEvents;
 var private bool bBridgeReady;
+var config string LastEventWriteStatus;
 
 function bool Initialize()
 {
@@ -11,44 +14,72 @@ function bool Initialize()
     }
 
     bBridgeReady = true;
-    EmitEvent("session_start", string(WorldInfo.GetPackageName()), -1, "local_standalone");
-    `log("AP:BRIDGE_READY mode=ONE_CLOSED_FILE_PER_EVENT");
+    LastEventWriteStatus = "ready_local_journal";
+    PersistJournal();
     return true;
 }
 
 function EmitEvent(string EventType, string MapName, int WaveNumber, string Detail)
 {
-    local FileWriter EventWriter;
+    local APGameInfo APGame;
+    local string Payload;
 
     if(!bBridgeReady)
     {
         return;
     }
 
-    EventSequence++;
-    EventWriter = Spawn(class'FileWriter');
-    if(EventWriter == none)
+    APGame = APGameInfo(WorldInfo.Game);
+    if(APGame == none || !APGame.CanEmitAPGameplayEvents())
     {
-        `warn("AP:BRIDGE_EVENT_FAILED reason=SPAWN_FILE_WRITER sequence=" $ EventSequence);
+        `warn("AP:BRIDGE_EVENT_BLOCKED reason=hero_permissions_unavailable event=" $ EventType);
         return;
     }
 
-    // FWFT_User confines output to the engine-managed User directory. DD1's
-    // old FileWriter does not expose its new length to another process until
-    // CloseFile(), so every event gets a unique file that is closed at once.
-    if(!EventWriter.OpenFile("DD1ArchipelagoEvent-" $ EventSequence, FWFT_User, "json", true, true))
-    {
-        `warn("AP:BRIDGE_EVENT_FAILED reason=OPEN_FILE sequence=" $ EventSequence);
-        EventWriter.Destroy();
+    if(EventType != "wave_complete" && EventType != "level_victory")
         return;
-    }
+    if(APGame.UnlockState == none || APGame.UnlockState.SeedIdentity == "")
+        return;
+    if(InStr(MapName, "|") != -1 || InStr(Detail, "|") != -1)
+        return;
+    Payload = APGame.UnlockState.SeedIdentity $ "|" $ EventType $ "|" $
+        MapName $ "|" $ WaveNumber $ "|" $ Detail;
+    if(PendingEvents.Find(Payload) != INDEX_NONE)
+        return;
+    PendingEvents.AddItem(Payload);
+    LastEventWriteStatus = "queued:" $ Payload;
+    PersistJournal();
+    if(APGame.InboundLink != none && APGame.InboundLink.IsConnected())
+        APGame.InboundLink.SendPendingEvent();
+}
 
-    EventWriter.Logf("{\"protocol\":1,\"sequence\":" $ EventSequence $
-        ",\"event\":\"" $ EventType $ "\",\"map\":\"" $ MapName $
-        "\",\"wave\":" $ WaveNumber $ ",\"detail\":\"" $ Detail $ "\"}");
-    EventWriter.CloseFile();
-    `log("AP:BRIDGE_EVENT_WRITTEN sequence=" $ EventSequence $ " file=" $ EventWriter.Filename);
-    EventWriter.Destroy();
+function string NextPendingEvent(string SeedIdentity)
+{
+    local string Payload;
+    if(SeedIdentity == "")
+        return "";
+    foreach PendingEvents(Payload)
+        if(Left(Payload, Len(SeedIdentity) + 1) == (SeedIdentity $ "|"))
+            return Payload;
+    return "";
+}
+
+function AcknowledgeEvent(string Payload)
+{
+    if(PendingEvents.Find(Payload) == INDEX_NONE)
+        return;
+    PendingEvents.RemoveItem(Payload);
+    LastEventWriteStatus = "acknowledged:" $ Payload;
+    PersistJournal();
+}
+
+function PersistJournal()
+{
+    // A later map spawns a new actor from the class defaults. Keep those in
+    // sync too; do not depend on native SaveConfig refreshing live defaults.
+    default.PendingEvents = PendingEvents;
+    default.LastEventWriteStatus = LastEventWriteStatus;
+    SaveConfig();
 }
 
 defaultproperties

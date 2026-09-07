@@ -4,6 +4,8 @@ var APGameInfo OwnerGame;
 var int BridgePort;
 var bool bHasBoundPort;
 var float LastResponseTime;
+var bool bSnapshotAccepted;
+var string LastSentEvent;
 
 function Initialize(APGameInfo NewOwner)
 {
@@ -29,6 +31,7 @@ function MaintainLocalConnection()
             return;
         }
         SendText("DD1PING1");
+        SendPendingEvent();
     }
     else
     {
@@ -63,9 +66,21 @@ function ConnectToLocalClient()
 
 event Opened()
 {
+    bSnapshotAccepted = false;
+    LastSentEvent = "";
     LastResponseTime = WorldInfo.RealTimeSeconds;
     `log("AP:LIVE_LINK_CONNECTED address=127.0.0.1 port=" $ BridgePort);
-    SendText("DD1HELLO1");
+    SendText("DD1HELLO3");
+}
+
+function SendPendingEvent()
+{
+    if(!bSnapshotAccepted || OwnerGame == none || OwnerGame.EventBridge == none ||
+        OwnerGame.UnlockState == none || WorldInfo.NetMode != NM_Standalone)
+        return;
+    LastSentEvent = OwnerGame.EventBridge.NextPendingEvent(OwnerGame.UnlockState.SeedIdentity);
+    if(LastSentEvent != "")
+        SendText("DD1EVENT1|" $ LastSentEvent);
 }
 
 event ReceivedLine(string Line)
@@ -73,6 +88,17 @@ event ReceivedLine(string Line)
     LastResponseTime = WorldInfo.RealTimeSeconds;
     if(Line == "DD1PONG1")
         return;
+    if(Left(Line, 8) == "DD1ACK1|")
+    {
+        if(bSnapshotAccepted && LastSentEvent != "" && Mid(Line, 8) == LastSentEvent &&
+            OwnerGame != none && OwnerGame.EventBridge != none && WorldInfo.NetMode == NM_Standalone)
+        {
+            OwnerGame.EventBridge.AcknowledgeEvent(LastSentEvent);
+            LastSentEvent = "";
+            SendPendingEvent();
+        }
+        return;
+    }
     if(Left(Line,8) == "DD1MSG1|")
     {
         if(OwnerGame != none)
@@ -81,11 +107,17 @@ event ReceivedLine(string Line)
     }
 
     if(OwnerGame != none && WorldInfo.NetMode == NM_Standalone)
-        OwnerGame.ApplyLiveUnlockSnapshot(Line);
+    {
+        bSnapshotAccepted = OwnerGame.ApplyLiveUnlockSnapshot(Line);
+        if(bSnapshotAccepted)
+            SendPendingEvent();
+    }
 }
 
 event Closed()
 {
+    bSnapshotAccepted = false;
+    LastSentEvent = "";
     `log("AP:LIVE_LINK_DISCONNECTED retrying=true");
 }
 

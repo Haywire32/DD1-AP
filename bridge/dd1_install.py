@@ -1,4 +1,4 @@
-"""Locate the Steam Dungeon Defenders Development Kit without scanning disks."""
+"""Locate regular Steam DD1 without scanning disks; retain legacy DDDK checks."""
 
 from __future__ import annotations
 
@@ -18,6 +18,88 @@ DDDK_RUNTIME_DLLS = (
 )
 DDDK_APP_ID = "216840"
 TC_DIRECTORY = "DD1ArchipelagoCurrent"
+RETAIL_EXECUTABLE = Path("Binaries") / "Win64" / "DunDefGame.exe"
+
+
+def validate_retail_install(root: Path) -> None:
+    """Read-only preflight for the cooked, Local-only regular-DD1 conversion."""
+    tc = root / "TotalConversions" / TC_DIRECTORY
+    required = [root / RETAIL_EXECUTABLE]
+    required += [tc / "CookedPCConsole" / name for name in (
+        "Startup_INT.upk", "TC_Textures.tfc", "TC_CharTextures.tfc",
+        "RefShaderCache_TC_-PC-D3D-SM3.upk",
+    )]
+    for path in required:
+        if not path.is_file() or not path.stat().st_size:
+            raise FileNotFoundError(f"Regular DD1 mod installation is incomplete: {path}. "
+                                    "Use the full retail-conversion package, not the older DDDK release.")
+    for suffix in ("Engine", "Game"):
+        for prefix in ("Default", "UDK"):
+            path = tc / "Config" / f"{prefix}{suffix}.ini"
+            # Retail creates generated settings on first launch. If present,
+            # they must not override the mod with the ordinary game classes.
+            if prefix == "UDK" and not path.exists():
+                continue
+            settings = {}
+            section = ""
+            for raw in path.read_text(encoding="utf-8-sig").splitlines():
+                line = raw.strip()
+                if not line or line.startswith((";", "#", "//")):
+                    continue
+                if line.startswith("[") and line.endswith("]"):
+                    section = line[1:-1].casefold()
+                elif "=" in line:
+                    key, value = line.split("=", 1)
+                    settings[(section, key.strip().casefold())] = value.strip().casefold()
+            expected = ({
+                ("engine.engine", "gameviewportclientclassname"): "dd1archipelago.apviewportclient",
+                ("onlinesubsystemsteamworks.onlinesubsystemsteamworks", "busevac"): "false",
+            } if suffix == "Engine" else {
+                ("engine.gameinfo", "defaultgame"): "dd1archipelago.apgameinfo",
+                ("engine.gameinfo", "defaultservergame"): "dd1archipelago.apgameinfo",
+            })
+            for key, value in expected.items():
+                if settings.get(key) != value:
+                    raise ValueError(f"Local-only DD1 mod configuration is not enabled in {path} ({key[1]}). "
+                                     "Replace the mod configuration from the matching release before launching.")
+
+
+def find_retail_root(explicit: Optional[Path] = None, *,
+                     steam_install_roots: Optional[Iterable[Path]] = None) -> Path:
+    """Use Steam's registered libraries or the user's explicit folder, never a disk scan."""
+    if explicit is not None:
+        root = Path(explicit).expanduser().resolve()
+        validate_retail_install(root)
+        return root
+    roots = list(steam_install_roots) if steam_install_roots is not None else _registered_steam_roots()
+    candidates = []
+    active = set()
+    for steam in _unique_paths(roots):
+        for library in _library_roots(steam):
+            installed = _manifest_install(library, "65800")
+            if installed is not None:
+                active.add(installed.resolve())
+                candidates.append(installed)
+            candidates.append(library / "steamapps" / "common" / "Dungeon Defenders")
+    valid, errors = [], []
+    for candidate in _unique_paths(candidates):
+        if not (candidate / RETAIL_EXECUTABLE).is_file():
+            continue
+        try:
+            validate_retail_install(candidate)
+        except (OSError, ValueError) as error:
+            errors.append(str(error))
+        else:
+            valid.append(candidate.resolve())
+    preferred = [path for path in valid if path in active] or valid
+    if len(preferred) == 1:
+        return preferred[0]
+    if len(preferred) > 1:
+        raise ValueError("More than one regular DD1 mod installation was found. Select one with --game-root.")
+    if errors:
+        raise ValueError("No usable regular DD1 mod installation. " + " ".join(errors))
+    raise FileNotFoundError("Regular Dungeon Defenders with the AP conversion was not found in Steam's libraries. "
+                            "Install the conversion or select its game folder with --game-root.")
 
 
 def validate_dddk_install(root: Path) -> None:
@@ -100,13 +182,13 @@ def validate_dddk_install(root: Path) -> None:
                 )
 
 
-def _manifest_install(library_root: Path) -> Optional[Path]:
+def _manifest_install(library_root: Path, app_id: str = DDDK_APP_ID) -> Optional[Path]:
     """Return Steam's installed copy, if its app manifest marks it installed."""
-    manifest = library_root / "steamapps" / f"appmanifest_{DDDK_APP_ID}.acf"
+    manifest = library_root / "steamapps" / f"appmanifest_{app_id}.acf"
     try:
         contents = manifest.read_text(encoding="utf-8-sig")
         fields = dict(re.findall(r'"([^"\\]+)"\s*"([^"\\]*)"', contents))
-        if fields.get("appid") != DDDK_APP_ID or not int(fields.get("StateFlags", "0")) & 4:
+        if fields.get("appid") != app_id or not int(fields.get("StateFlags", "0")) & 4:
             return None
         directory = fields.get("installdir", "")
         if not directory or directory in {".", ".."} or "/" in directory or "\\" in directory:

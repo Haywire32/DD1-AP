@@ -1,6 +1,7 @@
 class APGameReplicationInfo extends DunDefGameReplicationInfo;
 
 var int LastAPCompletedWave;
+var array<string> ReportedUnknownAPActions;
 
 simulated function ShowAPLockedMessage(string Message)
 {
@@ -37,19 +38,28 @@ simulated function bool IsHeroAllowed(DunDefPlayerController PC)
     local APGameInfo APGame;
     local string HeroKey;
 
-    if(WorldInfo.NetMode != NM_Standalone || PC == none)
+    if(WorldInfo.NetMode != NM_Standalone)
     {
         return true;
+    }
+    if(PC == none)
+    {
+        return false;
     }
 
     APGame = APGameInfo(WorldInfo.Game);
-    if(APGame == none || APGame.UnlockState == none)
+    if(APGame == none)
     {
         return true;
     }
+    if(APGame.UnlockState == none)
+    {
+        return false;
+    }
 
     HeroKey = APGame.UnlockState.GetHeroKey(PC.GetHero());
-    return HeroKey != "" && APGame.UnlockState.IsHeroUnlocked(HeroKey);
+    return HeroKey != "" && APGame.UnlockState.IsHeroUnlocked(HeroKey) &&
+        APGame.IsOwnedHero(PC.GetHero());
 }
 
 simulated function bool WeaponsEnabled()
@@ -85,8 +95,14 @@ simulated function bool CanPlaceTowerUnitCost(int Cost, DunDefPlayerController F
         APGame = APGameInfo(WorldInfo.Game);
         if(APGame != none && APGame.UnlockState != none)
         {
-            DefenseKey = APGame.UnlockState.GetDefenseKey(TowerArchetype);
-            if(DefenseKey != "" && !APGame.UnlockState.IsDefenseUnlocked(DefenseKey))
+            DefenseKey = APGame.UnlockState.GetDefenseKey(TowerArchetype,
+                APGame.UnlockState.GetHeroKey(ForPlayer.GetHero()));
+            if(DefenseKey == "")
+            {
+                ReportUnknownAPAction(PathName(TowerArchetype));
+                return false;
+            }
+            if(!APGame.UnlockState.IsDefenseUnlocked(DefenseKey))
             {
                 return false;
             }
@@ -94,6 +110,89 @@ simulated function bool CanPlaceTowerUnitCost(int Cost, DunDefPlayerController F
     }
 
     return super.CanPlaceTowerUnitCost(Cost, ForPlayer, TowerArchetype);
+}
+
+simulated function ReportUnknownAPAction(string ObjectPath)
+{
+    if(ReportedUnknownAPActions.Find(ObjectPath) == INDEX_NONE)
+    {
+        ReportedUnknownAPActions.AddItem(ObjectPath);
+        `warn("AP:UNSUPPORTED_ACTION blocked=" $ ObjectPath $
+            " reason=No verified AP mapping for this game version");
+    }
+}
+
+simulated function bool ShouldDenyAPAbility(DunDefPlayerAbility Ability)
+{
+    local APGameInfo APGame;
+    local DunDefPlayerController PC;
+    local DunDefPlayerAbility_BuildTower BuildAbility;
+    local string HeroKey;
+    local string ActionKey;
+
+    if(WorldInfo.NetMode != NM_Standalone)
+    {
+        return false;
+    }
+    APGame = APGameInfo(WorldInfo.Game);
+    if(APGame == none)
+    {
+        return false;
+    }
+    if(Ability == none || APGame.UnlockState == none)
+    {
+        return true;
+    }
+
+    PC = Ability.GetPC();
+    if(!IsHeroAllowed(PC))
+    {
+        return true;
+    }
+    HeroKey = APGame.UnlockState.GetHeroKey(PC.GetHero());
+
+    BuildAbility = DunDefPlayerAbility_BuildTower(Ability);
+    if(BuildAbility != none)
+    {
+        ActionKey = APGame.UnlockState.GetDefenseKey(BuildAbility.TowerArchetype, HeroKey);
+        if(ActionKey == "")
+        {
+            ReportUnknownAPAction(PathName(Ability.ObjectArchetype));
+            return true;
+        }
+        return !APGame.UnlockState.IsDefenseUnlocked(ActionKey);
+    }
+
+    ActionKey = APGame.UnlockState.GetAbilityKey(Ability, HeroKey);
+    if(ActionKey != "")
+    {
+        return !APGame.UnlockState.IsAbilityUnlocked(ActionKey);
+    }
+    if(APGame.UnlockState.IsBasicAbility(Ability, HeroKey))
+    {
+        return false;
+    }
+
+    // Unknown hero-specific actions do not become free unlocks after a game
+    // update. Essential ordinary controls have explicit verified identities.
+    ReportUnknownAPAction(PathName(Ability.ObjectArchetype));
+    return true;
+}
+
+simulated function bool UsePlayerAbilityStatusOverride(DunDefPlayerAbility Ability)
+{
+    // Deny-only: never return CANACTIVATE here for an owned action. Vanilla
+    // must still check its mana, cooldown, casting/phase and stance conditions.
+    return ShouldDenyAPAbility(Ability) || super.UsePlayerAbilityStatusOverride(Ability);
+}
+
+simulated function EPlayerAbilityStatus GetPlayerAbilityStatusOverride(DunDefPlayerAbility Ability)
+{
+    if(ShouldDenyAPAbility(Ability))
+    {
+        return EPA_NOTAPPLICABLE;
+    }
+    return super.GetPlayerAbilityStatusOverride(Ability);
 }
 
 function EndedCombatPhase()
@@ -124,6 +223,7 @@ function EndedCombatPhase()
 defaultproperties
 {
     LastAPCompletedWave=-1
+    bOverridePlayerAbilityStatus=true
 }
 
 simulated function DoLevelVictory()

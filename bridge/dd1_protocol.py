@@ -16,6 +16,11 @@ from collections.abc import Iterable
 PROTOCOL_VERSION = 1
 BRIDGE_STATE_VERSION = 3
 PROTOTYPE_LOCATION_ID_BASE = 9_100_000_000
+BASE_HERO_KEYS = ("apprentice", "squire", "huntress", "monk")
+HERO_KEYS = BASE_HERO_KEYS + (
+    "adept", "countess", "ranger", "initiate", "barbarian", "series_ev",
+    "summoner", "jester", "hermit", "gunwitch", "warden", "guardian",
+)
 
 
 @dataclass(frozen=True)
@@ -182,10 +187,12 @@ def switch_hero_profile(tc_root: Path, profiles_root: Path, identity: str) -> st
     profiles_root.mkdir(parents=True, exist_ok=True)
     marker = profiles_root / "active_profile.json"
     pending = profiles_root / "profile_switch_pending.json"
-    active_files = (tc_root / "DunDefHeroes.dun", tc_root / "DunDefHeroes.dun.bak")
+    active_files = (tc_root / "DunDefHeroes.dun", tc_root / "DunDefHeroes.dun.bak",
+                    tc_root / "Config" / "UDKDD1ArchipelagoRewards.ini")
 
-    def profile_files(key: str) -> tuple[Path, Path]:
-        return (profiles_root / f"{key}.dun", profiles_root / f"{key}.dun.bak")
+    def profile_files(key: str) -> tuple[Path, ...]:
+        return (profiles_root / f"{key}.dun", profiles_root / f"{key}.dun.bak",
+                profiles_root / f"{key}.rewards.ini")
 
     def read_key(path: Path, field: str) -> str | None:
         if not path.exists():
@@ -221,6 +228,8 @@ def switch_hero_profile(tc_root: Path, profiles_root: Path, identity: str) -> st
         for source, destination in zip(active_files, stored):
             if source.exists():
                 _atomic_copy(source, destination)
+            elif destination.exists():
+                destination.unlink()
     elif any(path.exists() for path in active_files):
         # Preserve the pre-feature shared TC save once; never discard it or
         # silently assign its progressed characters to a new randomizer seed.
@@ -565,8 +574,20 @@ def write_unlock_ini(
     *,
     level_six_heroes: Iterable[str] = (),
     experience_multiplier: int = 1,
+    active_heroes: Iterable[str] = BASE_HERO_KEYS,
+    seed_identity: str = "",
 ) -> None:
     state = validate_unlock_state(value)
+    if seed_identity and not re.fullmatch(r"dd1-[0-9a-f]{64}", seed_identity):
+        raise ProtocolError("invalid seed identity")
+    roster = tuple(dict.fromkeys(active_heroes))
+    early_heroes = tuple(dict.fromkeys(level_six_heroes))
+    if not roster or any(hero not in HERO_KEYS for hero in roster):
+        raise ProtocolError("active_heroes contains an unknown hero")
+    if any(hero not in roster for hero in early_heroes):
+        raise ProtocolError("level_six_heroes must belong to active_heroes")
+    if any(hero not in roster for hero in state["unlocked"]["heroes"]):
+        raise ProtocolError("unlocked heroes must belong to active_heroes")
     if isinstance(experience_multiplier, bool) or experience_multiplier not in {1, 2, 4, 6, 8, 10}:
         raise ProtocolError("experience_multiplier must be one of 1, 2, 4, 6, 8, or 10")
     unlocked = state["unlocked"]
@@ -574,6 +595,7 @@ def write_unlock_ini(
         "[DD1Archipelago.APUnlockState]",
         f"Revision={state['revision']}",
         f"Slot={state['slot']}",
+        f"SeedIdentity={seed_identity}",
         f"MaxEquipmentQuality={unlocked['max_equipment_quality']}",
         f"ExperienceMultiplier={experience_multiplier}",
     ]
@@ -586,9 +608,8 @@ def write_unlock_ini(
     for ini_name, state_name in field_names:
         lines.extend(f"{ini_name}={item}" for item in unlocked[state_name])
 
-    allowed_heroes = {'apprentice', 'squire', 'huntress', 'monk'}
-    lines.extend(f"LevelSixHeroes={hero}" for hero in dict.fromkeys(level_six_heroes)
-                 if hero in allowed_heroes)
+    lines.extend(f"ActiveHeroes={hero}" for hero in roster)
+    lines.extend(f"LevelSixHeroes={hero}" for hero in early_heroes)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")

@@ -1,223 +1,75 @@
 {
-  "schema_version": 1,
-  "project": "Dungeon Defenders Archipelago",
-  "source_version": "0.3.2",
-  "prepared_date": "2026-09-06",
-  "purpose": "Browsable source for review; not a runtime release or security certification.",
-  "reference_apworld_sha256": "2f50d1d1da1e94850da7ead51d8dd86d43e0dc4ec818afd8fe2fe5692c98034b",
-  "reference_game_mod_sha256": "8826719136e95386a9969b46ea0fab2906e1971771eddb683dd5f0f89a9ca8fb",
-  "rebuilt_apworld_sha256": "2f50d1d1da1e94850da7ead51d8dd86d43e0dc4ec818afd8fe2fe5692c98034b",
-  "validation": {
-    "python_tests_passed": 55,
-    "apworld_all_file_contents_match_reference": true,
-    "production_source_matches_workspace": true,
-    "unreal_source_matches_workspace": true,
-    "deterministic_python_build": true,
-    "existing_output_protected": true,
-    "source_only_inventory_passed": true,
-    "independent_security_audit": false,
-    "fresh_native_rebuild_performed_for_this_snapshot": false,
-    "fresh_pc_install_of_locally_built_dependencies_verified": false
+  "version": "0.4.0",
+  "runtime": "Steam DD1 x64, Local-only Total Conversion",
+  "release_files": {
+    "DD1ArchipelagoCurrent/Config/DefaultEngine.ini": "ddf954083bfe82121c9c2c3d4cd1625f28cd1acd26a8157212bd478ca6596ccd",
+    "DD1ArchipelagoCurrent/Config/DefaultGame.ini": "a06e533afdafeb47696fd013cee9ec2c0bb0cf6b0870d6d4eb0c629ef24c3399",
+    "DD1ArchipelagoCurrent/CookedPCConsole/Core.upk": "e68c9e282b5bdef4c526db62588e6d748e397e66e355f0dbd4abf8ef6f9fe7de",
+    "DD1ArchipelagoCurrent/CookedPCConsole/DunDefEntry.upk": "24a6bc8c1db2a073f5fd8a771dfb0596e3d01f03dc3518acc776d5989e2aebe9",
+    "DD1ArchipelagoCurrent/CookedPCConsole/DunDefMiscNoMedia.upk": "98a068822563f9bd0c408196c44a520f756c88cdddbd739d2f43dd248a71e9e0",
+    "DD1ArchipelagoCurrent/CookedPCConsole/DunDefTransition.upk": "aec1e3bceec957b6915af23280ba309b791c1b8d1a7f245d2abceffb24010b0b",
+    "DD1ArchipelagoCurrent/CookedPCConsole/EmptyRoom.upk": "4205370e674e2252fd76518c318d09158c2d995e6dd8a72433a9c727f90970d1",
+    "DD1ArchipelagoCurrent/CookedPCConsole/Engine.upk": "77c7a7aa8fdd4190634131e68a8e9dadd260520ceb5d97fb555b61a3b55470d1",
+    "DD1ArchipelagoCurrent/CookedPCConsole/GameFramework.upk": "c23e3ea87d30daa5ff938e38f5fa337785e86e9ce3a7b605377aa442de66df84",
+    "DD1ArchipelagoCurrent/CookedPCConsole/GlobalPersistentCookerData.upk": "cb9b6d8e64606eecc9c6851e5866e8f2cc9f4c555a4d337de5e8286297d742a1",
+    "DD1ArchipelagoCurrent/CookedPCConsole/GlobalShaderCache-PC-D3D-SM2.bin": "46048f0055c50ec400804a2e71c80af19678bfc5844d34a39694f6053d023ba4",
+    "DD1ArchipelagoCurrent/CookedPCConsole/GlobalShaderCache-PC-D3D-SM3.bin": "57f175a5add30aae6b27ba30c3504403ab309e9aa21d195cfbf941f06c267225",
+    "DD1ArchipelagoCurrent/CookedPCConsole/GlobalShaderCache-PC-D3D-SM4.bin": "976b4bc14a3e72bb852f72f91b3d4fcd1574016708b28cbcb35124a3614059d7",
+    "DD1ArchipelagoCurrent/CookedPCConsole/GuidCache.upk": "c3cf702e6eb035a61017462f6f1183d75a35fc8c6cea31c34ee2effe714603eb",
+    "DD1ArchipelagoCurrent/CookedPCConsole/IpDrv.upk": "7a2765867ae5848d9c139e5c2c271a36f74ca1320a017153cc2ceb59912711d9",
+    "DD1ArchipelagoCurrent/CookedPCConsole/Leaderboards.upk": "e6a3f71af1811fa5b4ca7084f3a6a3ae36fd391b587b03eb81e40ca87408da93",
+    "DD1ArchipelagoCurrent/CookedPCConsole/OnlineSubsystemGameSpy.upk": "9f0a4d2cfaeae422e4a213c300a1f487662cb494e536a2363969aeac4c5dc812",
+    "DD1ArchipelagoCurrent/CookedPCConsole/OnlineSubsystemSteamworks.upk": "8fd912a39045b97e2743483203abfe506411650560cf4d91781bb807be319b85",
+    "DD1ArchipelagoCurrent/CookedPCConsole/RefShaderCache_TC_-PC-D3D-SM2.upk": "926b286f7e626d598874fb15bf816c73f4233c67f548de634f41957e517aef40",
+    "DD1ArchipelagoCurrent/CookedPCConsole/RefShaderCache_TC_-PC-D3D-SM3.upk": "98efce321aaa0b26c86124c36b1679fde66b0696edeb1ebbc715ceec34ae669d",
+    "DD1ArchipelagoCurrent/CookedPCConsole/RefShaderCache_TC_-PC-D3D-SM4.upk": "522f2134b364c9dc2ff92c6c6533e32efc567f88892f7165ae1ffb8186132099",
+    "DD1ArchipelagoCurrent/CookedPCConsole/Startup_INT.upk": "60c210580705097152b540118b8474426663fd9048e7a37e944417e15f4c7d9f",
+    "DD1ArchipelagoCurrent/CookedPCConsole/TC_CharTextures.tfc": "0d23d689ee36db4ce0ae1b4f4e6d949a321a2570a673f5d49de01897c81be31c",
+    "DD1ArchipelagoCurrent/CookedPCConsole/TC_Textures.tfc": "f822aa5f3d86f67a185d8716ede8e03aa9553bba8f12372ccc0ce117ae17f159",
+    "DD1ArchipelagoCurrent/CookedPCConsole/UDKGame.upk": "a17d00019cc61dfb31a7d977704b858ed4902b61dceedf9a210b88d11c54d23e",
+    "Dungeon Defenders.yaml": "a508c54ba96344ac9a3671329a047cbc4259d1340a82c6bd7da3b1bbc23def70",
+    "dungeon_defenders.apworld": "fc65021625fbafe5ba088263b8cdd109fa93328e35b018e2c9357aa1bf00d58c",
+    "INSTALL.txt": "1b6fee9dccd0a1cd5ffee453557429da052c3fa50d858098092b2f62ffa69d90",
+    "RELEASE-NOTES.txt": "c26a937f537897dbc9d7b782be8ff298827693bbc1b0ce61397d78febf066063"
   },
-  "hashed_file_count": 38,
-  "hashed_total_bytes": 204352,
-  "notes": [
-    "The manifest excludes its own hash.",
-    "Checksums identify content; they do not authenticate it or certify safety.",
-    "The released and rebuilt apworld archives are byte-identical, including every archived file and ZIP metadata.",
-    "The seven UnrealScript source files are unchanged from 0.3.1. Historical native-rebuild results are retained in game/PATCHING.md; no new native compilation was performed for this source snapshot.",
-    "The public 0.3.2 runtime includes compiled game dependencies; local compilation is optional developer work. The project owner reports redistribution permission, which this source audit did not independently verify."
-  ],
-  "files": [
-    {
-      "path": ".gitignore",
-      "bytes": 358,
-      "sha256": "24f0e0aa88b0db58ea81cd923037cbcd86c952c3b5c9842e021490c40abb212a"
-    },
-    {
-      "path": "apworld/archipelago.json",
-      "bytes": 162,
-      "sha256": "9b2e6aef762e738e810e278e5f18c91aa1c9070f7d06f2aad7ceffdcf2928c08"
-    },
-    {
-      "path": "apworld/dungeon_defenders/__init__.py",
-      "bytes": 15531,
-      "sha256": "8a867b7312225b34ed85d7ef5e8b9564cf4bc2321c925baa2c8010f3280b980f"
-    },
-    {
-      "path": "apworld/dungeon_defenders/Client.py",
-      "bytes": 27082,
-      "sha256": "ac6e9b396b6c2f204d98619d028aab9caa8277bc7084adff698b46a6570781d7"
-    },
-    {
-      "path": "apworld/dungeon_defenders/items.py",
-      "bytes": 5690,
-      "sha256": "0a5a8901f60a083ce9d1b8cf9b9cea5ed5154ae42f10ab3134cd6077b87bdc44"
-    },
-    {
-      "path": "apworld/dungeon_defenders/locations.py",
-      "bytes": 1771,
-      "sha256": "4114778590218a8c2b9d0aafcedd8cb86a0f08a974b03d96fe3d2e196cdb5e1e"
-    },
-    {
-      "path": "apworld/dungeon_defenders/public_yaml.py",
-      "bytes": 2681,
-      "sha256": "0edd91c79dfa9d9405d677ac15941d32c54f3006a20fcea986033c1ab1ba7686"
-    },
-    {
-      "path": "bridge/dd1_ap_adapter.py",
-      "bytes": 3054,
-      "sha256": "1183eb09eab079436a9200ef49d8064af1fee28fd5b4131f97f97f93cb33b8cf"
-    },
-    {
-      "path": "bridge/dd1_bridge_service.py",
-      "bytes": 3988,
-      "sha256": "a42a14c0390021655f6947646f173c3ddcb9cdac2c25eba8c6a2f5cd3466df5e"
-    },
-    {
-      "path": "bridge/dd1_event_watcher.py",
-      "bytes": 2823,
-      "sha256": "6cbf981bb42a153419b4e7b847d742bba9984286c1afd433ae380ca019fde1e4"
-    },
-    {
-      "path": "bridge/dd1_install.py",
-      "bytes": 9796,
-      "sha256": "ff45b2308872765d679265850672d0efd1a925565b6fb5a01cb001fd572e1312"
-    },
-    {
-      "path": "bridge/dd1_protocol.py",
-      "bytes": 24457,
-      "sha256": "8e6afcfb07ce441d22ceb6e6f2b43a618900352b42290faf49ee533b579e45b3"
-    },
-    {
-      "path": "bridge/test_dd1_client.py",
-      "bytes": 12881,
-      "sha256": "61458cfc6c38efdb05b46f97a35b82f6ebcc126c7cf0b61900927206d4aa8ebd"
-    },
-    {
-      "path": "bridge/test_dd1_install.py",
-      "bytes": 8468,
-      "sha256": "1dc116e2798c0525493d06f6a6c8b56023322c70e94b0f61852dce7508f38184"
-    },
-    {
-      "path": "bridge/test_dd1_protocol.py",
-      "bytes": 17374,
-      "sha256": "f7c63353857d6fd0a05c8a9514605b5944ec49ffc26e8835dd1c524f443da1a2"
-    },
-    {
-      "path": "bridge/test_opening_package.py",
-      "bytes": 2293,
-      "sha256": "2b58a4ff90b8e752baf03027319ed24e1e2030fb5f5d73901f2538de021698de"
-    },
-    {
-      "path": "bridge/test_public_yaml.py",
-      "bytes": 1945,
-      "sha256": "38ce6133dc11a1361444e336056055400dfc4d0b541da31e6c75df971ade76fc"
-    },
-    {
-      "path": "bridge/test_summit_options.py",
-      "bytes": 2827,
-      "sha256": "7c3e8820a48d12dfe476c72c6309294a5481caabd146ac361f3e0faf2fa3f46b"
-    },
-    {
-      "path": "docs/PYTHON-BUILD.md",
-      "bytes": 1397,
-      "sha256": "25f32fb7567282dcb4bf3177054010a351aa882980622d8fafafdb6ea4c154a8"
-    },
-    {
-      "path": "docs/SECURITY.md",
-      "bytes": 3033,
-      "sha256": "8ae17c8a03b7ecbfded6cc807e3cc54d01b4567539c811e7355e9286758bcbf7"
-    },
-    {
-      "path": "game/Classes/APEventBridge.uc",
-      "bytes": 1732,
-      "sha256": "5427aa11d6a0550ce5234c3ad02ad79310b45bdab0afc7b56d66dfb7e0e6e10c"
-    },
-    {
-      "path": "game/Classes/APGameInfo.uc",
-      "bytes": 17078,
-      "sha256": "ef014b306b00b4fce12c0964c5d0b597d2c4abfed8be8ff7db0d5b31cc6f5a35"
-    },
-    {
-      "path": "game/Classes/APGameReplicationInfo.uc",
-      "bytes": 4753,
-      "sha256": "9cb508e9e03fe0045d311cd862a89de7318ea9e5a7b9f1ff692f49f6624a519f"
-    },
-    {
-      "path": "game/Classes/APInboundLink.uc",
-      "bytes": 2169,
-      "sha256": "142f274bb1084ace4fefea3484d42a0608c085c095f2425ef6af08102800f14f"
-    },
-    {
-      "path": "game/Classes/APRewardState.uc",
-      "bytes": 276,
-      "sha256": "ade2b5eb2b96ed744a806cac53414d8a21e433d91e182c86acacea4c1532835d"
-    },
-    {
-      "path": "game/Classes/APUnlockState.uc",
-      "bytes": 8119,
-      "sha256": "a4365ded4cccdedbf3899697c72f8ba59d960916417cdfe71392d990b4aada1d"
-    },
-    {
-      "path": "game/Classes/APViewportClient.uc",
-      "bytes": 2574,
-      "sha256": "8826dd715b3100cd77f784b36c723f7edf58092c42865634ed985823521a3515"
-    },
-    {
-      "path": "game/PATCHING.md",
-      "bytes": 5984,
-      "sha256": "06a9690b3b59859cdc1a7a23a5711f1532152f139d5d7d8bd1af30f4df3a0b21"
-    },
-    {
-      "path": "release/clean-config/DD1ArchipelagoUnlocks.ini",
-      "bytes": 82,
-      "sha256": "1873f09779b12af2d61db5109315c3cc85ee4e973f60bf81a75cfa7aa12ccb78"
-    },
-    {
-      "path": "release/clean-config/DefaultEngine.ini",
-      "bytes": 1495,
-      "sha256": "9b54c7e34453f877cbdd37329d792cef8fa45af6aa362073558520a209b03772"
-    },
-    {
-      "path": "release/clean-config/DefaultGame.ini",
-      "bytes": 234,
-      "sha256": "555bdced37800f88fc60bf12db0d4865738dd58583f14d727daa11d3cfbce482"
-    },
-    {
-      "path": "release/clean-config/UDKDD1ArchipelagoRewards.ini",
-      "bytes": 93,
-      "sha256": "f4f4671546ec8025c981f39051ece18512a8cfe1ac81e7a5fdd320aa1fece5b9"
-    },
-    {
-      "path": "release/clean-config/UDKDD1ArchipelagoUnlocks.ini",
-      "bytes": 82,
-      "sha256": "1873f09779b12af2d61db5109315c3cc85ee4e973f60bf81a75cfa7aa12ccb78"
-    },
-    {
-      "path": "release/Dungeon Defenders.yaml",
-      "bytes": 985,
-      "sha256": "27fc67da456cef93cdc13264ae5459fb89b4652c94a559c427fc5e22ee0df948"
-    },
-    {
-      "path": "release/INSTALL.txt",
-      "bytes": 1929,
-      "sha256": "329058294dd6838bc04e2b0c951353ac28cb5dbad3534f93262f921738ba42c9"
-    },
-    {
-      "path": "release/UPDATE.txt",
-      "bytes": 1814,
-      "sha256": "932cdebd5facc939977662fae1f411a598bb56148136e6e7e092952e6f83d029"
-    },
-    {
-      "path": "source.md",
-      "bytes": 2091,
-      "sha256": "7407c5bcf51d907129858041e099d13ca68da72366fc95beab29249ddd96bc18"
-    },
-    {
-      "path": "tools/build_apworld.py",
-      "bytes": 5251,
-      "sha256": "7aec7d9b4d5dc672473e7ae3668c1d7a5d2adc19ba393a38d6a9a338c73dae5f"
-    }
-  ]
+  "source_files": {
+    "apworld/archipelago.json": "8b17fcebf4f54eaff74d0cfe7ce218d6532da74be1f5b68d667ee7fe92d68ad9",
+    "apworld/dungeon_defenders/__init__.py": "2b7192804151598a7d4c0b6075cae25a3031e37d01d5ae083499e5f09fa1cd77",
+    "apworld/dungeon_defenders/Client.py": "ff870a5b5129bacb7e91c66c60b8e57ef9046e7ddbd0cf205a846f58c4386eed",
+    "apworld/dungeon_defenders/heroes.py": "74060d0315f5f7a6682a4ac948c5331ce008ea79cf571036c2b7b55c88aee6c3",
+    "apworld/dungeon_defenders/items.py": "d51f8e227dc1b32df6fe80365d85969f67907457882db8a70cb85fc01f521557",
+    "apworld/dungeon_defenders/locations.py": "4114778590218a8c2b9d0aafcedd8cb86a0f08a974b03d96fe3d2e196cdb5e1e",
+    "apworld/dungeon_defenders/public_yaml.py": "0edd91c79dfa9d9405d677ac15941d32c54f3006a20fcea986033c1ab1ba7686",
+    "bridge/dd1_ap_adapter.py": "1183eb09eab079436a9200ef49d8064af1fee28fd5b4131f97f97f93cb33b8cf",
+    "bridge/dd1_bridge_service.py": "63157e4aa8f381af72528675af66606fa0c5a011a737d278858a20c46e82b8b9",
+    "bridge/dd1_event_watcher.py": "6cbf981bb42a153419b4e7b847d742bba9984286c1afd433ae380ca019fde1e4",
+    "bridge/dd1_install.py": "3918e365db90e1a0e81cf306a25cd022b5895d00e22f8d9e6a9b42ce38de4fea",
+    "bridge/dd1_protocol.py": "3ff3ba22334e00a585247a09b70ab5308e7076734fa068db774d608b661684cd",
+    "bridge/test_dd1_client.py": "2480de7ff973af4ae5496b69a62b678ad415397530fe876a740ae5fa8a5cc4d1",
+    "bridge/test_dd1_install.py": "1dc116e2798c0525493d06f6a6c8b56023322c70e94b0f61852dce7508f38184",
+    "bridge/test_dd1_live_events.py": "fede4c49a46e8eefb2781c80d87b41c12e6db906832fc88709017281fb7ee5af",
+    "bridge/test_dd1_protocol.py": "b30b76ca672f2e5ed1e0102ba443386c494244f60954a9101f9208cdde1b8cd9",
+    "bridge/test_dd1_retail_install.py": "7cdad5da96882112db3a775f0547dad0ac549b79ab7a85ca5e71283c09bcb3b8",
+    "bridge/test_dlc_roster.py": "975f2148ac111202bdae846057e6b3443b59f2399d20422790f547d7014a1549",
+    "bridge/test_opening_package.py": "8c781a21660178201eaca6059fc0f2201a5e1c4767ba5c43515ca005de336d6a",
+    "bridge/test_public_yaml.py": "38ce6133dc11a1361444e336056055400dfc4d0b541da31e6c75df971ade76fc",
+    "bridge/test_summit_options.py": "7c3e8820a48d12dfe476c72c6309294a5481caabd146ac361f3e0faf2fa3f46b",
+    "game/BuildOnly/APRetailMenuProbe.uc": "3e5d04bff3e573f5271588fe77cbdd800a1bcfc7fe0f9c54877f539259b2c320",
+    "game/Classes/APEventBridge.uc": "7d19a76c91d659f197fc408d50bdeffa7eb67aa173a311b2d120e075505d76ee",
+    "game/Classes/APGameInfo.uc": "87806c5784f6efffb82d4742045b69f027f940def8c1ee94574c4ba8d706f483",
+    "game/Classes/APGameReplicationInfo.uc": "a98fe95ad65b1e93214977e94ca0c388c4465e867a33f37c37bd42493b6922a8",
+    "game/Classes/APHeroEntitlements.uc": "c12341b13e59e0a79838c58052d36534938cd84b4dd646b72710afc89c0d6783",
+    "game/Classes/APInboundLink.uc": "0bf697bdbffd6378e80e5a91fd656f8103ac37938d9fd04304a53c0abdc79774",
+    "game/Classes/APLocalViewportClient.uc": "d40691f17ea4baea4716529656ba58fbd0c1b52aa9e52154e98c28314bd865dd",
+    "game/Classes/APPlayerController.uc": "4569ed78353380e43b6d4f64256d3ebb371766e083f4ecfd6097dfbef84d6c3c",
+    "game/Classes/APRewardState.uc": "ade2b5eb2b96ed744a806cac53414d8a21e433d91e182c86acacea4c1532835d",
+    "game/Classes/APUnlockState.uc": "39ec6401ffe7f33d94cad9efbf8582eff198d0784fb0a320e56522d7c503d789",
+    "game/Classes/APViewportClient.uc": "418fb77ee9a13ce14d61df6fdd5f2a03408c2b8c3b8c5c860c5b3853ac42e34b",
+    "game/PATCHING.md": "aa925f7503bce9317225836632365887b4e77afa853f8181ec1563d4d1267118",
+    "release/Dungeon Defenders.yaml": "a508c54ba96344ac9a3671329a047cbc4259d1340a82c6bd7da3b1bbc23def70",
+    "release/INSTALL.txt": "1b6fee9dccd0a1cd5ffee453557429da052c3fa50d858098092b2f62ffa69d90",
+    "release/retail-config/DefaultEngine.ini": "ddf954083bfe82121c9c2c3d4cd1625f28cd1acd26a8157212bd478ca6596ccd",
+    "release/retail-config/DefaultGame.ini": "a06e533afdafeb47696fd013cee9ec2c0bb0cf6b0870d6d4eb0c629ef24c3399",
+    "tools/build_apworld.py": "24cf2d0b000ca3c88a271a8ce502089118bf3eaa0dddc501580c4cf38f3e1e87"
+  }
 }

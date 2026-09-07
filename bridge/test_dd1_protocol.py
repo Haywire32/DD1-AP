@@ -46,13 +46,16 @@ VICTORY_EVENT = {
 
 
 class ProtocolTests(unittest.TestCase):
-    def test_level_six_config_is_seed_specific_and_filters_invalid_heroes(self):
+    def test_level_six_config_is_seed_specific_and_rejects_invalid_heroes(self):
         value = {'protocol': 1, 'revision': 1, 'slot': 'Haywire', 'unlocked': {
             'heroes': ['squire'], 'defenses': [], 'abilities': [], 'maps': [],
             'max_equipment_quality': 19}}
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'unlocks.ini'
-            write_unlock_ini(path, value, level_six_heroes=['squire', 'monk', 'squire', 'bad\nInjected=1'])
+            with self.assertRaises(ProtocolError):
+                write_unlock_ini(path, value, level_six_heroes=['bad\nInjected=1'])
+            self.assertFalse(path.exists())
+            write_unlock_ini(path, value, level_six_heroes=['squire', 'monk', 'squire'])
             text = path.read_text()
             self.assertEqual(text.count('LevelSixHeroes='), 2)
             self.assertNotIn('Injected', text)

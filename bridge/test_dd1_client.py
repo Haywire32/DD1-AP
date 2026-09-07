@@ -76,6 +76,94 @@ class ClientPortabilityTests(unittest.IsolatedAsyncioTestCase):
         writer.wait_closed = AsyncMock()
         return writer
 
+    async def test_v2_roster_and_starting_minion_reach_game_config(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ctx = self.make_context(Path(directory))
+            ctx.state_path = Path(directory) / "state.json"
+            client.atomic_write_json(ctx.state_path, client.empty_bridge_state())
+            ctx.slot_data.update({
+                "dd1_slot_data_version": 2,
+                "active_heroes": ["summoner", "barbarian"],
+                "starting_hero": "summoner",
+                "starting_minion": "Spider Minion (Summoner)",
+                "level_six_heroes": ["summoner", "barbarian"],
+            })
+            ctx._apply_unlocks()
+            text = ctx.unlock_path.read_text()
+            self.assertIn("ActiveHeroes=summoner", text)
+            self.assertIn("LevelSixHeroes=barbarian", text)
+            self.assertIn("UnlockedDefenses=summoner.spider_minion", text)
+            fields = ctx.live_snapshot.strip().split("|")
+            self.assertEqual(len(fields), 13)
+            self.assertEqual(fields[0], "APSTATE4")
+            self.assertEqual(set(fields[10].split(",")), {"summoner", "barbarian"})
+            self.assertEqual(fields[11], "4")
+            self.assertEqual(set(fields[12].split(",")), {"summoner", "barbarian"})
+
+    async def test_v2_rejects_invalid_starter_before_mutating_save(self):
+        ctx = self.make_context()
+        ctx.slot_data.update({"dd1_slot_data_version": 2,
+                              "active_heroes": ["squire", "barbarian"]})
+        with self.assertRaisesRegex(client.ProtocolError, "starting hero"):
+            ctx._active_heroes(ctx.slot_data)
+
+    async def test_old_game_handshake_does_not_receive_dlc_permissions(self):
+        ctx = self.make_context()
+        ctx.live_snapshot = "APSTATE4|never-deliver\r\n"
+        reader = asyncio.StreamReader()
+        reader.feed_data(b"DD1HELLO1\n")
+        reader.feed_eof()
+        writer = self.make_writer()
+        with self.assertLogs(client.logger, level="ERROR"):
+            await ctx._handle_live_game(reader, writer)
+        writer.write.assert_not_called()
+        self.assertFalse(ctx.game_connected_once)
+
+    async def test_excluded_hero_receipt_does_not_grant_permissions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ctx = self.make_context(Path(directory))
+            ctx.state_path = Path(directory) / "state.json"
+            state = client.empty_bridge_state()
+            client.ingest_received_packet(state, {"index": 0, "items": [{
+                "item": client.ITEM_NAME_TO_ID["Guardian"], "location": 1, "player": 1,
+            }]})
+            client.atomic_write_json(ctx.state_path, state)
+            ctx._apply_unlocks()
+            self.assertNotIn("UnlockedHeroes=guardian", ctx.unlock_path.read_text())
+
+    async def test_future_slot_version_is_rejected(self):
+        ctx = self.make_context()
+        with self.assertRaisesRegex(client.ProtocolError, "slot-data version"):
+            ctx._select_slot_state({"dd1_slot_data_version": 999})
+
+    async def test_local_summit_unlock_refreshes_without_receiving_an_item(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ctx = self.make_context(Path(directory))
+            ctx.slot_data.update({"summit_required_maps": 1, "summit_unlock_difficulty": 0})
+            ctx.state_path = Path(directory) / "state.json"
+            state = client.empty_bridge_state()
+            client.atomic_write_json(ctx.state_path, state)
+            ctx._apply_unlocks()
+            old_revision = int(ctx.live_snapshot.split("|")[2])
+            state["victory_history"] = {"dd1.campaign.CAMPDW.victory.easy": {}}
+            client.atomic_write_json(ctx.state_path, state)
+            ctx._apply_unlocks()
+            self.assertIn("CAMPTS", ctx.live_snapshot.split("|")[6])
+            self.assertGreater(int(ctx.live_snapshot.split("|")[2]), old_revision)
+
+    async def test_event_poll_retries_durably_pending_checks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ctx = self.make_context(Path(directory))
+            ctx.state_path = Path(directory) / "state.json"
+            state = client.empty_bridge_state()
+            state["pending_location_ids"] = [9100000001]
+            client.atomic_write_json(ctx.state_path, state)
+            ctx._reconcile_checks = AsyncMock(side_effect=lambda: ctx.exit_event.set())
+            ctx._queue_unlock_write = Mock()
+            await ctx._poll_game_events()
+            ctx._reconcile_checks.assert_awaited_once()
+            ctx._queue_unlock_write.assert_not_called()
+
     async def test_incomplete_mod_stops_before_save_or_state_mutations(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -130,7 +218,7 @@ class ClientPortabilityTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0)
         writer.write.assert_not_called()
         self.assertFalse(ctx.live_clients)
-        reader.feed_data(b"DD1HELLO1\nDD1PING1\n")
+        reader.feed_data(b"DD1HELLO3\nDD1PING1\n")
         reader.feed_eof()
         with self.assertLogs(client.logger, level="INFO") as messages:
             await handler
@@ -212,7 +300,7 @@ class ClientPortabilityTests(unittest.IsolatedAsyncioTestCase):
             loop = asyncio.get_running_loop()
             loop_thread = threading.get_ident()
             packet_saved = threading.Event()
-            service_globals = client.process_once.__globals__
+            service_globals = client.receive_live_event.__globals__
             original_load = service_globals["load_bridge_state"]
 
             def receive_packet():
@@ -235,14 +323,18 @@ class ClientPortabilityTests(unittest.IsolatedAsyncioTestCase):
 
             with patch.dict(service_globals, {
                 "load_bridge_state": load_then_schedule_packet,
-                "event_files": lambda directories: [root / "session.json"],
-                "read_closed_event": lambda path: {"event": "session_start"},
             }):
-                await asyncio.wait_for(ctx._poll_game_events(), timeout=3)
+                reader = asyncio.StreamReader()
+                reader.feed_data(("DD1HELLO3\nDD1EVENT1|" + ctx._live_seed_identity()
+                                  + "|wave_complete|DD_Lev_02|1|EGD_EASY\n").encode())
+                reader.feed_eof()
+                await asyncio.wait_for(ctx._handle_live_game(reader, self.make_writer()), timeout=3)
+                await asyncio.sleep(0)
             state = client.load_bridge_state(ctx.state_path)
             self.assertEqual(len(state["received_items"]), 1)
             self.assertEqual(state["last_received_index"], 0)
-            self.assertIn("session.json", state["processed_files"])
+            self.assertEqual(len(state["processed_files"]), 1)
+            self.assertTrue(state["processed_files"][0].startswith("tcp:"))
 
     async def test_failed_process_query_cannot_switch_hero_save(self):
         ctx = self.make_context()
@@ -284,14 +376,14 @@ class ClientPortabilityTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_install_failure_opens_error_window_before_gui_startup(self):
         parser = Mock()
-        parser.parse_args.return_value = argparse.Namespace(dddk_root=None)
+        parser.parse_args.return_value = argparse.Namespace(game_root=None)
         parser.error.side_effect = SystemExit(2)
         popup = Mock()
         with patch.object(client, "get_base_parser", return_value=parser), \
                 patch.object(client, "gui_enabled", True), \
                 patch.object(client.CommonClient, "handle_url_arg", side_effect=lambda args, **kwargs: args, create=True), \
                 patch.object(client.Utils, "messagebox", popup, create=True), \
-                patch.object(client, "find_dddk_root", side_effect=ValueError("Mod configuration is missing")):
+                patch.object(client, "find_retail_root", side_effect=ValueError("Mod configuration is missing")):
             with self.assertRaises(SystemExit):
                 client.launch()
         popup.assert_called_once_with(

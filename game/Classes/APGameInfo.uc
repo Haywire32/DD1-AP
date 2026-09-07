@@ -7,6 +7,9 @@ var APRewardState RewardState;
 var int PendingXPRewardCount;
 var int PendingManaRewardCount;
 var array<string> APMessageQueue;
+var bool bAPReturningToMenu;
+var DunDefPlayerController APDeniedHeroController;
+var string APDeniedHeroReason;
 
 struct APHeroExperienceTracker
 {
@@ -60,12 +63,43 @@ static event class<GameInfo> SetGameType(string MapName, string Options, string 
     return SelectedGameType;
 }
 
+event InitGame(string Options, out string ErrorMessage)
+{
+    if(WorldInfo != none && WorldInfo.NetMode != NM_Standalone)
+    {
+        ErrorMessage = "Archipelago supports Local play only.";
+        bAPReturningToMenu = true;
+        ConsoleCommand("quit");
+        return;
+    }
+    super.InitGame(Options, ErrorMessage);
+}
+
+event PreLogin(string Options, string Address, out string ErrorMessage)
+{
+    if(WorldInfo == none || WorldInfo.NetMode != NM_Standalone)
+    {
+        ErrorMessage = "Archipelago supports Local play only.";
+        return;
+    }
+    // Preserve the engine's local-player initialization as well as split-screen.
+    super.PreLogin(Options, Address, ErrorMessage);
+}
+
 simulated event PostBeginPlay()
 {
+    if(WorldInfo.NetMode != NM_Standalone)
+    {
+        bAPReturningToMenu = true;
+        ConsoleCommand("quit");
+        return;
+    }
     super.PostBeginPlay();
 
     if(WorldInfo.NetMode == NM_Standalone)
     {
+        if(bAPReturningToMenu)
+            return;
         `log("AP:INITIALIZED map=" $ WorldInfo.GetMapName() $ " mode=LOCAL_STANDALONE");
         UnlockState = new(self) class'APUnlockState';
         RewardState = new(self) class'APRewardState';
@@ -200,13 +234,15 @@ function ApplyAPExperienceMultiplier()
     }
 }
 
-function ApplyLiveUnlockSnapshot(string Snapshot)
+function bool ApplyLiveUnlockSnapshot(string Snapshot)
 {
     local array<string> Fields;
     local array<string> NewHeroes;
     local array<string> NewDefenses;
     local array<string> NewAbilities;
     local array<string> NewMaps;
+    local array<string> NewActiveHeroes;
+    local array<string> NewLevelSixHeroes;
     local int NewRevision;
     local int ReceivedXPRewards;
     local int ReceivedManaRewards;
@@ -214,20 +250,21 @@ function ApplyLiveUnlockSnapshot(string Snapshot)
     local DunDefPlayerController PC;
 
     if(WorldInfo.NetMode != NM_Standalone || UnlockState == none)
-        return;
+        return false;
 
     ParseStringIntoArray(Snapshot, Fields, "|", false);
-    if(Fields.Length != 10 || Fields[0] != "APSTATE3")
+    if(Fields.Length != 13 || Fields[0] != "APSTATE4" || Fields[10] == "-")
     {
         `warn("AP:REJECTED_LIVE_UNLOCK_SNAPSHOT reason=invalid_format");
-        return;
+        return false;
     }
 
     NewSeedIdentity = Fields[1];
-    if(NewSeedIdentity == "")
+    if(NewSeedIdentity == "" || UnlockState.SeedIdentity == "" ||
+        NewSeedIdentity != UnlockState.SeedIdentity)
     {
-        `warn("AP:REJECTED_LIVE_UNLOCK_SNAPSHOT reason=missing_seed_identity");
-        return;
+        `warn("AP:REJECTED_LIVE_UNLOCK_SNAPSHOT reason=wrong_or_missing_seed_restart_required");
+        return false;
     }
 
     // Reward counters are cumulative only within one seed/team/slot identity.
@@ -252,7 +289,7 @@ function ApplyLiveUnlockSnapshot(string Snapshot)
     ApplyPendingFillerRewards();
 
     if(NewRevision <= UnlockState.Revision)
-        return;
+        return true;
 
     if(Fields[3] != "-")
         ParseStringIntoArray(Fields[3], NewHeroes, ",", true);
@@ -262,12 +299,18 @@ function ApplyLiveUnlockSnapshot(string Snapshot)
         ParseStringIntoArray(Fields[5], NewAbilities, ",", true);
     if(Fields[6] != "-")
         ParseStringIntoArray(Fields[6], NewMaps, ",", true);
+    ParseStringIntoArray(Fields[10], NewActiveHeroes, ",", true);
+    if(Fields[12] != "-")
+        ParseStringIntoArray(Fields[12], NewLevelSixHeroes, ",", true);
 
     UnlockState.Revision = NewRevision;
     UnlockState.UnlockedHeroes = NewHeroes;
     UnlockState.UnlockedDefenses = NewDefenses;
     UnlockState.UnlockedAbilities = NewAbilities;
     UnlockState.UnlockedMaps = NewMaps;
+    UnlockState.ActiveHeroes = NewActiveHeroes;
+    UnlockState.LevelSixHeroes = NewLevelSixHeroes;
+    UnlockState.ExperienceMultiplier = int(Fields[11]);
     UnlockState.MaxEquipmentQuality = int(Fields[7]);
     ApplyOwnedMapVisibility();
 
@@ -283,6 +326,7 @@ function ApplyLiveUnlockSnapshot(string Snapshot)
     }
 
     CorrectLockedActiveHeroes();
+    return true;
 }
 
 function ApplyPendingFillerRewards()
@@ -307,7 +351,7 @@ function ApplyPendingFillerRewards()
             continue;
 
         Hero = PC.GetHero();
-        if(Hero == none)
+        if(Hero == none || !IsOwnedHero(Hero))
             continue;
 
         bEarlyHero = UnlockState != none &&
@@ -462,7 +506,136 @@ function bool IsOwnedHero(DunDefHero Hero)
         return false;
 
     HeroKey = UnlockState.GetHeroKey(Hero);
-    return HeroKey != "" && UnlockState.IsHeroUnlocked(HeroKey);
+    return HeroKey != "" && UnlockState.ContainsValue(UnlockState.ActiveHeroes, HeroKey) &&
+        UnlockState.IsHeroUnlocked(HeroKey) &&
+        class'APHeroEntitlements'.static.IsHeroLicensed(HeroKey);
+}
+
+function bool IsAPHeroGameplayWorld()
+{
+    local DunDefMapInfo MapInfo;
+
+    if(WorldInfo.NetMode != NM_Standalone)
+        return false;
+    MapInfo = DunDefMapInfo(WorldInfo.GetMapInfo());
+    return MapInfo != none && (MapInfo.IsGameplayLevel || MapInfo.IsLobbyLevel);
+}
+
+function bool CanEmitAPGameplayEvents()
+{
+    local DunDefPlayerController PC;
+    local bool bHasPlayableHero;
+
+    if(bAPReturningToMenu || !IsAPHeroGameplayWorld() || UnlockState == none ||
+        UnlockState.SeedIdentity == "")
+        return false;
+    foreach WorldInfo.AllControllers(class'DunDefPlayerController', PC)
+    {
+        if(!PC.IsLocalPlayerController())
+            continue;
+        if(PC.MyHero == none)
+            continue;
+        if(!IsOwnedHero(PC.MyHero))
+            return false;
+        bHasPlayableHero = true;
+    }
+    return bHasPlayableHero;
+}
+
+function RejectUnavailableHero(DunDefPlayerController PC, DunDefHero Hero)
+{
+    local DunDefPlayer InvalidPawn;
+    local DunDefGameReplicationInfo GRI;
+    local string HeroKey;
+
+    // No title-screen hero creation/preview checks here. Only reject an
+    // actual selected hero about to enter, or already inside, playable Local.
+    if(bAPReturningToMenu || !IsAPHeroGameplayWorld() || PC == none || Hero == none)
+        return;
+    bAPReturningToMenu = true;
+    APDeniedHeroController = PC;
+    if(UnlockState != none)
+        HeroKey = UnlockState.GetHeroKey(Hero);
+    if(HeroKey != "" && !class'APHeroEntitlements'.static.IsHeroLicensed(HeroKey))
+        APDeniedHeroReason = "Archipelago cannot verify DLC ownership for " $
+            UnlockState.GetHeroDisplayName(HeroKey) $ ". Returning to the main menu.";
+    else
+        APDeniedHeroReason = "This hero is not unlocked and active in this Archipelago seed. Returning to the main menu.";
+    `warn("AP:HERO_ENTRY_REJECTED hero=" $ HeroKey $ " reason=" $ APDeniedHeroReason);
+    PC.ClientMessage(APDeniedHeroReason);
+
+    // Stop checks and passive pet effects while the menu transition is
+    // pending. Attack pets do not consult the WeaponsEnabled override.
+    if(EventBridge != none)
+    {
+        EventBridge.Destroy();
+        EventBridge = none;
+    }
+    GRI = DunDefGameReplicationInfo(WorldInfo.GRI);
+    if(GRI != none)
+    {
+        GRI.bDisableFamiliarAbilities = true;
+        GRI.bDisableWeaponry = true;
+    }
+    ClearTimer('CorrectLockedActiveHeroes');
+    ClearTimer('ApplyAPExperienceMultiplier');
+    ClearTimer('DisplayNextAPMessage');
+
+    InvalidPawn = DunDefPlayer(PC.Pawn);
+    if(InvalidPawn != none && !IsOwnedHero(InvalidPawn.GetHero()))
+    {
+        // Destroy the runtime pawn, not its saved hero, equipment or profile.
+        // Do not use damage/death, which can invoke normal death/save effects.
+        PC.UnPossess();
+        InvalidPawn.Destroy();
+    }
+
+    // Leave the stock RestartPlayer/hero-swap call stack before travelling.
+    // No retry loop: this runs once, with no invalid pawn able to respawn.
+    SetTimer(0.01, false, 'ReturnRejectedHeroToMenu');
+}
+
+function ReturnRejectedHeroToMenu()
+{
+    local DunDefPlayerController PC;
+
+    PC = APDeniedHeroController;
+    APDeniedHeroController = none;
+    if(PC == none)
+        return;
+    PC.QuitToMainMenu(true);
+}
+
+function Pawn SpawnDefaultPawnFor(Controller NewPlayer, NavigationPoint StartSpot)
+{
+    local DunDefPlayerController PC;
+    local DunDefHero Hero;
+
+    if(IsAPHeroGameplayWorld())
+    {
+        if(bAPReturningToMenu)
+            return none;
+        PC = DunDefPlayerController(NewPlayer);
+        if(PC != none && PC.IsLocalPlayerController())
+        {
+            // MyHero avoids GetHero's initialization side effects inside the
+            // pawn-spawn hook. Fall back to the already selected saved hero.
+            Hero = PC.MyHero;
+            if(Hero == none && class'DunDefHeroManager'.static.GetHeroManager() != none)
+                Hero = class'DunDefHeroManager'.static.GetHeroManager().GetActiveHero(PC.Player);
+            if(Hero != none)
+            {
+                if(UnlockState == none)
+                    UnlockState = new(self) class'APUnlockState';
+                if(!IsOwnedHero(Hero))
+                {
+                    RejectUnavailableHero(PC, Hero);
+                    return none;
+                }
+            }
+        }
+    }
+    return super.SpawnDefaultPawnFor(NewPlayer, StartSpot);
 }
 
 function CorrectLockedActiveHeroes()
@@ -475,6 +648,8 @@ function CorrectLockedActiveHeroes()
     local DataListEntryInterface HeroEntry;
     local int UserID;
 
+    if(bAPReturningToMenu)
+        return;
     ApplyPendingFillerRewards();
 
     HeroManager = class'DunDefHeroManager'.static.GetHeroManager();
@@ -507,6 +682,11 @@ function CorrectLockedActiveHeroes()
         {
             HeroManager.SetActiveHero(Candidate, LP);
             PC.ClientMessage("Archipelago: Switched to an unlocked hero.");
+        }
+        else if(CurrentHero != none && IsAPHeroGameplayWorld())
+        {
+            RejectUnavailableHero(DunDefPlayerController(PC), CurrentHero);
+            return;
         }
     }
 }
@@ -546,21 +726,18 @@ function UpdateGlobalHeroModifiers(DunDefPlayerController ThePC)
     }
 
     HeroKey = UnlockState.GetHeroKey(ThePC.GetHero());
-    HeroUnlocked = HeroKey != "" && UnlockState.IsHeroUnlocked(HeroKey);
+    HeroUnlocked = IsOwnedHero(ThePC.GetHero());
 
-    // Clear the current hero's mapped classes first so a later revision or a
-    // hero swap can grant an ability that was previously disabled. The same
-    // base class is reused by some otherwise unrelated hero abilities.
+    // Per-instance GRI checks enforce AP ownership. Shared ability classes
+    // must not be disabled globally (stances, curses and beams reuse them).
     foreach ThePC.PlayerAbilities(Ability)
     {
         // AP grants replace level-based unlock announcements only.
         Ability.bWasUnderRequiredLevel = false;
         Ability.ClearTimer('LocalNotifyUnlock');
-        AbilityKey = UnlockState.GetAbilityKey(Ability);
+        AbilityKey = UnlockState.GetAbilityKey(Ability, HeroKey);
         if(AbilityKey != "")
         {
-            ThePC.RemoveDisabledAbility(Ability.Class);
-
             // In Archipelago, receiving the ability replaces DD1's normal
             // hero-level unlock. Mana, phase, cooldown, and other gameplay
             // restrictions still apply.
@@ -573,7 +750,7 @@ function UpdateGlobalHeroModifiers(DunDefPlayerController ThePC)
         BuildAbility = DunDefPlayerAbility_BuildTower(Ability);
         if(BuildAbility != none && BuildAbility.TowerArchetype != none)
         {
-            DefenseKey = UnlockState.GetDefenseKey(BuildAbility.TowerArchetype);
+            DefenseKey = UnlockState.GetDefenseKey(BuildAbility.TowerArchetype, HeroKey);
             if(DefenseKey != "" && HeroUnlocked && UnlockState.IsDefenseUnlocked(DefenseKey))
             {
                 // The AP item is the complete permission to build this
@@ -583,18 +760,10 @@ function UpdateGlobalHeroModifiers(DunDefPlayerController ThePC)
         }
     }
 
-    foreach ThePC.PlayerAbilities(Ability)
-    {
-        AbilityKey = UnlockState.GetAbilityKey(Ability);
-        if(AbilityKey != "" && (!HeroUnlocked || !UnlockState.IsAbilityUnlocked(AbilityKey)))
-        {
-            ThePC.AddDisabledAbility(Ability.Class);
-        }
-    }
-
 }
 
 defaultproperties
 {
+    PlayerControllerClass=class'APPlayerController'
     GameReplicationInfoClass=class'APGameReplicationInfo'
 }

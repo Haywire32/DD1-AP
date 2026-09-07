@@ -3,19 +3,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from itertools import combinations
 
 from BaseClasses import CollectionState, Item, ItemClassification, Location, Region
-from Options import PerGameCommonOptions, Range, Choice
+from Options import PerGameCommonOptions, Range, Choice, OptionSet
 from worlds.AutoWorld import World
 
 from worlds.LauncherComponents import Component, Type, components
 from worlds.LauncherComponents import launch as launch_component
 
 from .dd1_protocol import CAMPAIGN_MAPS
+from .heroes import (
+    DEFAULT_HERO_KEYS, HERO_BY_KEY, SUMMIT_FILLER_COUNT,
+    choose_opening, normalize_hero_keys,
+)
 from .items import (
     ANTI_AIR_DEFENSES,
-    DAMAGING_DEFENSES,
     DEFENSE_OWNER,
     MANA_FILLER_ITEM,
     XP_FILLER_ITEM,
@@ -24,7 +26,7 @@ from .items import (
     ITEM_NAME_TO_ID,
     MAP_ITEMS,
     MAP_TIERS,
-    PROGRESSION_ITEMS,
+    progression_items_for_heroes,
 )
 from .locations import (
     LOCATION_DIFFICULTY,
@@ -36,6 +38,29 @@ from .locations import (
 
 
 GAME_NAME = "Dungeon Defenders"
+
+
+class ActiveHeroes(OptionSet):
+    """Choose 2 to 8 heroes to include in this seed. Choose only heroes whose DLC
+    you own; selecting a hero here does not grant DLC ownership. Valid names:
+    apprentice, adept, squire, countess, huntress, ranger, monk, initiate,
+    barbarian, series_ev, summoner, jester, hermit, gunwitch, warden, guardian.
+    Do not select both members of Apprentice/Adept, Squire/Countess,
+    Huntress/Ranger, or Monk/Initiate. Include at least one builder. Larger
+    rosters must leave room for six Summit filler rewards. Names can be a YAML
+    list or comma-separated text; order does not affect generation.
+    """
+    display_name = "Active Heroes"
+    default = frozenset(DEFAULT_HERO_KEYS)
+    valid_keys = frozenset(HERO_BY_KEY)
+
+    @classmethod
+    def from_any(cls, data):
+        return cls(set(normalize_hero_keys(data)))
+
+    @classmethod
+    def from_text(cls, data):
+        return cls.from_any(data)
 
 
 class SummitRequiredMaps(Range):
@@ -76,6 +101,7 @@ class ExperienceMultiplier(Choice):
 
 @dataclass
 class DungeonDefendersOptions(PerGameCommonOptions):
+    active_heroes: ActiveHeroes
     summit_required_maps: SummitRequiredMaps
     summit_unlock_difficulty: SummitUnlockDifficulty
     summit_goal_difficulty: SummitGoalDifficulty
@@ -103,45 +129,25 @@ class DungeonDefendersWorld(World):
     locked_map_rewards: set[str]
     second_hero: str
     extra_defenses: tuple[str, str]
+    active_heroes: tuple[str, ...]
+    progression_names: tuple[str, ...]
+    first_wave_reward: str | None
+    starting_minion: str | None
 
     def generate_early(self) -> None:
-        self.starting_hero = self.random.choice(tuple(HERO_ITEMS))
-        # One hero, Deeper Well, and no precollected defenses or abilities.
-        # The Deeper Well is the only reliably manageable level for a fresh
-        # character before the first-wave damaging-defense guarantee arrives.
+        option = getattr(self.options, "active_heroes", None)
+        configured = option.value if option is not None else DEFAULT_HERO_KEYS
+        opening = choose_opening(configured, self.random)
+        self.active_heroes = normalize_hero_keys(configured)
+        self.progression_names = progression_items_for_heroes(self.active_heroes)
+        self.starting_hero = HERO_BY_KEY[opening.starting_hero].name
+        self.second_hero = HERO_BY_KEY[opening.second_hero].name
         self.starting_map = "The Deeper Well Map"
-        hero_key = HERO_ITEMS[self.starting_hero]
-        candidate_defenses = [
-            name for name, owner in DEFENSE_OWNER.items()
-            if owner == hero_key and name in DAMAGING_DEFENSES
-        ]
-        self.early_defense = self.random.choice(candidate_defenses)
-        anti_air_candidates = [
-            name for name, owner in DEFENSE_OWNER.items()
-            if owner == hero_key and name in ANTI_AIR_DEFENSES
-        ]
-        self.early_anti_air = (
-            self.early_defense
-            if self.early_defense in ANTI_AIR_DEFENSES
-            else self.random.choice(anti_air_candidates)
-        )
-        self.second_hero = self.random.choice([h for h in HERO_ITEMS if h != self.starting_hero])
-        owners = {hero_key, HERO_ITEMS[self.second_hero]}
-        generic = {
-            'Magic Missile Tower (Apprentice)', 'Deadly Striker Tower (Apprentice)',
-            'Spike Blockade (Squire)', 'Bouncer Blockade (Squire)',
-            'Harpoon Turret (Squire)', 'Bowling Ball Turret (Squire)',
-            'Slice and Dice Blockade (Squire)', 'Proximity Mine Trap (Huntress)',
-        }
-        candidates = [n for n, owner in DEFENSE_OWNER.items()
-                      if owner in owners and n != self.early_defense]
-        packages = [pair for pair in combinations(candidates, 2)
-                    if any(DEFENSE_OWNER[n] == HERO_ITEMS[self.second_hero] for n in pair)
-                    and ({self.early_defense, *pair} & generic)
-                    and ({self.early_defense, *pair} & ANTI_AIR_DEFENSES)]
-        self.extra_defenses = self.random.choice(packages)
-        self.early_anti_air = next(n for n in (self.early_defense, *self.extra_defenses)
-                                  if n in ANTI_AIR_DEFENSES)
+        self.first_wave_reward = opening.first_wave_reward
+        self.starting_minion = opening.starting_minion
+        self.early_defense = opening.first_wave_reward or opening.starting_minion
+        self.extra_defenses = opening.extra_defenses
+        self.early_anti_air = opening.anti_air
 
     def create_item(self, name: str) -> DungeonDefendersItem:
         return DungeonDefendersItem(
@@ -188,9 +194,10 @@ class DungeonDefendersWorld(World):
             name for name, wave in LOCATION_WAVE.items()
             if LOCATION_MAP_TAG[name] == MAP_ITEMS[self.starting_map] and wave == 1
         )
-        self.multiworld.get_location(first_wave_location, self.player).place_locked_item(
-            self.create_item(self.early_defense)
-        )
+        if self.first_wave_reward is not None:
+            self.multiworld.get_location(first_wave_location, self.player).place_locked_item(
+                self.create_item(self.first_wave_reward)
+            )
 
         # All three additional opening rewards arrive by Medium completion.
         for location_name, item_name in (
@@ -268,15 +275,30 @@ class DungeonDefendersWorld(World):
 
     def _has_usable_defense(self, state: CollectionState) -> bool:
         for defense_name, owner_key in DEFENSE_OWNER.items():
-            hero_name = next(name for name, key in HERO_ITEMS.items() if key == owner_key)
+            if owner_key not in self.active_heroes:
+                continue
+            hero_name = HERO_BY_KEY[owner_key].name
             if state.has(hero_name, self.player) and state.has(defense_name, self.player):
                 return True
         return False
 
+    def _has_usable_combat(self, state: CollectionState) -> bool:
+        # A non-builder must be able to reach the wave-two builder reward and
+        # wave-three defense using normal weapon attacks. Tier-two/three map
+        # entry still separately requires an owned anti-air defense and hero.
+        return self._has_usable_defense(state) or any(
+            not HERO_BY_KEY[key].builder and state.has(HERO_BY_KEY[key].name, self.player)
+            for key in self.active_heroes
+        )
+
     def create_items(self) -> None:
         starters = {self.starting_hero, self.starting_map}
-        locked_rewards = self.locked_map_rewards | {self.early_defense, self.second_hero, *self.extra_defenses}
-        for name in PROGRESSION_ITEMS:
+        if self.starting_minion is not None:
+            starters.add(self.starting_minion)
+        locked_rewards = self.locked_map_rewards | {self.second_hero, *self.extra_defenses}
+        if self.first_wave_reward is not None:
+            locked_rewards.add(self.first_wave_reward)
+        for name in self.progression_names:
             item = self.create_item(name)
             if name in starters:
                 self.multiworld.push_precollected(item)
@@ -285,7 +307,9 @@ class DungeonDefendersWorld(World):
             else:
                 self.multiworld.itempool.append(item)
 
-        filler_count = len(LOCATION_NAME_TO_ID) - (len(PROGRESSION_ITEMS) - len(starters))
+        filler_count = len(LOCATION_NAME_TO_ID) - (len(self.progression_names) - len(starters))
+        if filler_count < SUMMIT_FILLER_COUNT:
+            raise ValueError("The selected hero items do not leave enough filler for The Summit.")
         xp_count = (filler_count + 1) // 2
         mana_count = filler_count - xp_count
         for _ in range(xp_count):
@@ -302,14 +326,16 @@ class DungeonDefendersWorld(World):
             entrance = self.multiworld.get_region(region_name, self.player).entrances[0]
             old_rule = entrance.access_rule
             entrance.access_rule = lambda state, old=old_rule: old(state) and any(
-                state.has(n, self.player) and state.has(next(h for h, k in HERO_ITEMS.items()
-                    if k == DEFENSE_OWNER[n]), self.player) for n in ANTI_AIR_DEFENSES)
+                DEFENSE_OWNER[n] in self.active_heroes
+                and state.has(n, self.player)
+                and state.has(HERO_BY_KEY[DEFENSE_OWNER[n]].name, self.player)
+                for n in ANTI_AIR_DEFENSES)
 
         for name, wave in LOCATION_WAVE.items():
             if wave == 1:
                 continue
             location = self.multiworld.get_location(name, self.player)
-            set_rule(location, lambda state, world=self: world._has_usable_defense(state))
+            set_rule(location, lambda state, world=self: world._has_usable_combat(state))
 
         for name in LOCATION_NAME_TO_ID:
             if name.startswith("The Summit -"):
@@ -329,9 +355,11 @@ class DungeonDefendersWorld(World):
 
     def fill_slot_data(self) -> dict:
         return {
-            "dd1_slot_data_version": 1,
+            "dd1_slot_data_version": 2,
+            "active_heroes": list(self.active_heroes),
             "starting_hero": HERO_ITEMS[self.starting_hero],
             "starting_map": MAP_ITEMS[self.starting_map],
+            "starting_minion": self.starting_minion,
             "level_six_heroes": [HERO_ITEMS[self.starting_hero], HERO_ITEMS[self.second_hero]],
             "early_anti_air": self.early_anti_air,
             # Hard-or-higher Summit victory is the goal signal, not a location.

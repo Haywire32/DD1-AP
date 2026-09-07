@@ -1,4 +1,4 @@
-Dungeon Defenders Archipelago - version 0.3.3
+Dungeon Defenders Archipelago - version 0.4.0 playtest
 ================================================
 
 This mod is for Play Local only.
@@ -6,16 +6,19 @@ This mod is for Play Local only.
 Requirements
 ------------
 - Dungeon Defenders from Steam
-- Dungeon Defenders Development Kit from Steam
 - Archipelago 0.6.7 or newer
+- The DLC for any extra heroes you select in your YAML
 
 Game install and setup
 -----------------------------------
-1. Install/update BOTH Dungeon Defenders and Dungeon Defenders Development Kit
-   in Steam.
-2. Open the install folder of both Dungeon Defenders and Dungeon Defenders Development Kit
-3. Copy all files from \Steam\steamapps\common\Dungeon Defenders into Steam\steamapps\common\DungeonDefendersDevelopmentKit. 
-   Select yes when asked to overwrite existing files.
+1. Install/update Dungeon Defenders in Steam. Keep Steam running and signed in.
+2. In Steam, right-click Dungeon Defenders, then Manage > Browse local files.
+
+Use English as the game's language for this playtest (Steam > Properties >
+General > Language). This build includes the English cooked startup package.
+
+This version runs in regular DD1. You do NOT need DDDK, Discord files, or to
+copy the game into another folder. Windows 64-bit is required.
 
 Mod installation
 ---------------
@@ -23,7 +26,8 @@ Mod installation
    Alternatively put the file into your \Archipelago\custom_worlds folder.
 
 2. Copy the DD1ArchipelagoCurrent folder
-   to: \Steam\steamapps\common\DungeonDefendersDevelopmentKit\TotalConversions
+   to: \Steam\steamapps\common\Dungeon Defenders\TotalConversions
+   Create TotalConversions if it does not exist.
    The final path is ...\TotalConversions\DD1ArchipelagoCurrent.
 3. Copy Dungeon Defenders.yaml to the Players folder in your Archipelago installation. Edit its slot name
    and documented options, then generate normally.
@@ -34,18 +38,45 @@ Open Archipelago Launcher, select Dungeon Defenders Client, and enter the
 server and slot. The game should launch automatically. 
 Choose Play Local; online play is intentionally disabled.
 
-The client finds the Development Kit through Steam's library locations, including
+The client finds Dungeon Defenders through Steam's library locations, including
 other drives. You do not need to open the editor, use Cook TC, or compile files.
 No Discord downloads or extra installer scripts are needed.
 
-Updating an existing installation
+Coming from 0.3.x
 ---------------------------------
 1. Double-click the new dungeon_defenders.apworld to update the client.
-2. Merge the new DD1ArchipelagoCurrent folder over the existing folder in
-   TotalConversions and replace matching files. Do not delete the existing folder.
+2. Put the new DD1ArchipelagoCurrent folder in REGULAR Dungeon Defenders as above,
+   not in the Development Kit. Do not copy old DDDK mod files into this folder.
+3. Generate a new seed for 0.4.0. Old 0.3.x seeds and saves are not supported
+   for this migration. Your old DDDK files can stay where they are.
 
-Your existing YAML, seed, characters, unlocks and rewards are kept. You do not
-need to reinstall the game or Development Kit.
+Use the included YAML as a reference for the new hero option. Keep a copy of
+your own edited YAML. The public template uses PlayerName, not the author's slot.
+
+Heroes and fresh runs
+--------------------
+Edit active_heroes in the YAML to choose 2 to 8 heroes. All names are listed there.
+Only choose DLC heroes you own. The game checks ownership through Steam; the
+YAML cannot grant DLC. A seed containing unowned heroes may be impossible to finish.
+Do not select both a base hero and its counterpart, such as Squire and Countess.
+
+Each new seed gets separate characters and progress. Reconnecting to the same
+seed resumes it. For a completely fresh run, generate a new seed and connect to
+its new server room. Deleting a character alone does not reset AP checks.
+
+Playing normal DD1
+------------------
+Close the AP game and client, then launch Dungeon Defenders normally from Steam.
+Do not select the Archipelago Total Conversion for online play. The mod does
+not replace your normal game's executable or normal character save.
+
+Playtest notes
+--------------
+DLC heroes are enabled, but not every hero, ability or costume has been tested
+in gameplay. Please report the hero, map, difficulty and what happened.
+Some menu tabs can get stuck; close and reopen the menu if this happens.
+The first guaranteed defense costs at most 140 mana. More expensive defenses
+can arrive later and still require enough mana to build.
 
 The client should say "Game connected: Archipelago mod loaded." and the game
 should show its Archipelago starting-items popup. A server connection alone

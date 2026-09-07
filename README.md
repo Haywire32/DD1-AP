@@ -36,12 +36,12 @@ You can find the [download here](https://github.com/Haywire32/DD1-AP/releases/ta
 1. Double-click dungeon_defenders.apworld to install it.
    Alternatively put the file into your \Archipelago\custom_worlds folder.
 2. Copy the DD1ArchipelagoCurrent folder
-   to: \Steam\steamapps\common\DungeonDefendersDevelopmentKit\TotalConversions
-
+   to: \Steam\steamapps\common\Dungeon Defenders\TotalConversions
+   Create TotalConversions if it does not exist.
    The final path is ...\TotalConversions\DD1ArchipelagoCurrent.
-4. Copy Dungeon Defenders.yaml to C:\Archipelago\Players. Edit its slot name
+3. Copy Dungeon Defenders.yaml to the Players folder in your Archipelago installation. Edit its slot name
    and documented options, then generate normally.
-
+   
 ### Play
 Open Archipelago Launcher, select Dungeon Defenders Client, and enter the
 server and slot. The game should launch automatically. 

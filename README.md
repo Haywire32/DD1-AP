@@ -17,12 +17,11 @@ This mod is for Local play only.
 - Bank mana
 
 ### Download
-You can find the [download here](https://github.com/Haywire32/DD1-AP/releases/tag/v0.3.3)
+You can find the [download here](https://github.com/Haywire32/DD1-AP/releases/tag/v0.4.1)
 
 # Installation guide
 ### Requirements
 - Dungeon Defenders from Steam
-- Dungeon Defenders Development Kit from Steam
 - Archipelago 0.6.7 or newer
 
 ### Game install
@@ -54,7 +53,6 @@ The current version is still unstable and most likely has bugs.
 
 ### Future plans and ideas
 - Game balance adjustments
-- DLC heroes
 - More checks and rewards
 
 ### Disclaimer

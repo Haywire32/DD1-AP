@@ -1,0 +1,48 @@
+Dungeon Defenders Archipelago - version 0.5.0 playtest
+================================================
+
+This mod is for Play Local only.
+
+Requirements
+------------
+- Dungeon Defenders from Steam
+- Archipelago 0.6.7 or newer
+- The DLC for any extra heroes you select in your YAML
+
+Game install and setup
+-----------------------------------
+1. Install/update Dungeon Defenders in Steam. Keep Steam running and signed in.
+2. In Steam, right-click Dungeon Defenders, then Manage > Browse local files.
+
+Use English as the game's language for this playtest (Steam > Properties >
+General > Language).
+
+This version runs in regular DD1. DDDK is no longer needed.
+
+Mod installation
+---------------
+1. Double-click dungeon_defenders.apworld to install it.
+   Alternatively put the file into your \Archipelago\custom_worlds folder.
+2. Copy the DD1ArchipelagoCurrent folder
+   to: \Steam\steamapps\common\Dungeon Defenders\TotalConversions
+   Create TotalConversions if it does not exist.
+   The final path is ...\TotalConversions\DD1ArchipelagoCurrent.
+3. Copy Dungeon Defenders.yaml to the Players folder in your Archipelago installation. Edit its slot name
+   and documented options, then generate normally.
+
+Play
+----
+Open Archipelago Launcher, select Dungeon Defenders Client, and enter the
+server and slot. The game should launch automatically. 
+Choose Play Local; online play is intentionally disabled.
+
+The client finds Dungeon Defenders through Steam's library locations, including
+other drives. You do not need to open the editor, use Cook TC, or compile files.
+No Discord downloads or extra installer scripts are needed.
+
+
+Playing normal DD1
+------------------
+Close the AP game and client, then launch Dungeon Defenders normally from Steam.
+Do not select the Archipelago Total Conversion for online play. The mod does
+not replace your normal game's executable or normal character save.

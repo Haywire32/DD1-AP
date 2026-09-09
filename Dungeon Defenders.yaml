@@ -1,0 +1,65 @@
+# Dungeon Defenders Archipelago 0.5.0
+
+name: PlayerName
+description: Dungeon Defenders Archipelago 0.5.0
+
+game: Dungeon Defenders
+requires:
+  version: 0.6.7
+
+Dungeon Defenders:
+  # Choose 2 to 16 heroes. You must own any DLC heroes you select.
+  # Names: apprentice, squire, huntress, monk, adept, countess, ranger, initiate,
+  # barbarian, series_ev, summoner, jester, hermit, gunwitch, warden, guardian.
+  # Include at least one builder. Counterparts can be chosen together.
+  active_heroes: [apprentice, squire, huntress, monk]
+
+  # Multiplies all normal gameplay experience after DD1 applies its own bonuses. Choose 1, 2, 4, 6, 8, or 10.
+  experience_multiplier: 1
+
+  # local: map unlocks stay in your DD1 campaign. global: maps can also be in other archipelago worlds.
+  map_unlock_placement: local
+
+  # Select which difficulties give checks per wave. Any combination of easy, medium, hard, insane. Higher difficulty levels automatically clear the lower ones.
+  campaign_check_difficulties: [easy, medium, hard]
+
+  #  Add survival levels as checks: true/false. 
+  survival_checks: true
+
+  # Select survival difficulty that gives the checks. Choose only one: easy, medium, hard, insane. Higher difficulty levels will count as lower ones.
+  survival_check_difficulty: medium
+  # Choose 5, 10, 15, 20, or 25. Every wave from 1 gives a check.
+  survival_max_wave: 10
+
+  #  Add challenge levels as checks: true/false. 
+  challenge_checks: false
+  challenge_check_difficulty: medium
+
+  # True/false: enable modes as separate item unlocks. Difficulty_unlocks requires at least easy enabled in campaign_check_difficulties
+  # Difficulty unlocks are progressive: Medium, then Hard, then Insane.
+  difficulty_unlocks: false
+  survival_unlock: false
+  challenge_unlock: false
+
+  # Choose the completion goal, either summit or challenges. summit: beat The Summit on required difficulty. challenges: beat X amount of challenges as a goal. 
+  # challenges as goal requires challenge_checks: true. challenges as goal will add The Summit to the regular map pool like any other map.
+  completion_goal: summit
+
+  # If summit as goal is selected: Beat a set amount of campaign maps to unlock "The Summit". Beat this level on a set difficulty to win.
+  # Choose the amount of levels you need to beat to unlock the final map "The Summit". Valid numbers are 1 to 11.
+  summit_required_maps: 11
+  # Choose the map difficulty that is required to progress towards "The Summit" unlock. Beating higher difficulties counts for any lower ones. For example, you have to beat all 11 maps on at least medium to unlock "The Summit". Choose one: easy, medium, hard, or insane
+  summit_unlock_difficulty: medium
+  # Choose the difficulty required for "The Summit" to beat the Archipelago goal. Choose one: easy, medium, hard, or insane
+  summit_goal_difficulty: hard
+
+  # If challenges as goal is selected: choose amount required as a goal, and choose the difficulty required to beat each level to get the goal.
+  challenges_required: 1
+  challenge_goal_difficulty: medium
+
+  progression_balancing:
+    normal: 50
+    
+  accessibility:
+    full: 50
+    minimal: 0

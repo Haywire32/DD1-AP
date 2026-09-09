@@ -380,11 +380,20 @@ def load_bridge_state(path: Path) -> dict[str, Any]:
         "received_items",
         "goal_complete",
     }
-    if set(value) - {"summit_settings", "victory_history"} != required:
+    if set(value) - {"summit_settings", "victory_history", "content_settings", "challenge_victories"} != required:
         raise ProtocolError("invalid bridge-state shape")
     summit_settings(value.get("summit_settings", {}))
     if not isinstance(value.get("victory_history", {}), dict):
         raise ProtocolError("invalid victory history")
+    if "content_settings" in value:
+        try:
+            from .dd1_content import ContentSettings
+        except ImportError:
+            from dd1_content import ContentSettings
+        ContentSettings.from_slot_data(value["content_settings"])
+    challenges = value.get("challenge_victories", {})
+    if not isinstance(challenges, dict) or any(not isinstance(k, str) or type(v) is not int or not 0 <= v <= 5 for k, v in challenges.items()):
+        raise ProtocolError("invalid challenge victory history")
     if value["protocol"] != PROTOCOL_VERSION:
         raise ProtocolError("unsupported bridge-state protocol")
     if value["state_version"] != BRIDGE_STATE_VERSION:
@@ -576,6 +585,8 @@ def write_unlock_ini(
     experience_multiplier: int = 1,
     active_heroes: Iterable[str] = BASE_HERO_KEYS,
     seed_identity: str = "",
+    difficulty_mask: int = 15,
+    mode_mask: int = 3,
 ) -> None:
     state = validate_unlock_state(value)
     if seed_identity and not re.fullmatch(r"dd1-[0-9a-f]{64}", seed_identity):
@@ -591,6 +602,10 @@ def write_unlock_ini(
     if isinstance(experience_multiplier, bool) or experience_multiplier not in {1, 2, 4, 6, 8, 10}:
         raise ProtocolError("experience_multiplier must be one of 1, 2, 4, 6, 8, or 10")
     unlocked = state["unlocked"]
+    if type(difficulty_mask) is not int or not 1 <= difficulty_mask <= 15 or not difficulty_mask & 1:
+        raise ProtocolError("difficulty permissions must include Easy")
+    if type(mode_mask) is not int or not 0 <= mode_mask <= 3:
+        raise ProtocolError("invalid mode permissions")
     lines = [
         "[DD1Archipelago.APUnlockState]",
         f"Revision={state['revision']}",
@@ -598,6 +613,8 @@ def write_unlock_ini(
         f"SeedIdentity={seed_identity}",
         f"MaxEquipmentQuality={unlocked['max_equipment_quality']}",
         f"ExperienceMultiplier={experience_multiplier}",
+        f"DifficultyMask={difficulty_mask}",
+        f"ModeMask={mode_mask}",
     ]
     field_names = (
         ("UnlockedHeroes", "heroes"),

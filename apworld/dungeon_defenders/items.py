@@ -2,6 +2,7 @@
 
 from BaseClasses import ItemClassification
 from .heroes import HEROES, HERO_BY_KEY, normalize_hero_keys
+from .dd1_content import XP_REWARDS, MANA_REWARDS, MODE_ITEMS, DIFFICULTY_ITEMS, SUMMIT_MAP_ITEM, PROGRESSIVE_DIFFICULTY
 
 
 ITEM_ID_BASE = 9_200_000_000
@@ -24,6 +25,7 @@ MAP_ITEMS = {
     "Royal Gardens Map": "CAMPRG",
     "The Ramparts Map": "CAMPRP",
     "Endless Spires Map": "CAMPES",
+    SUMMIT_MAP_ITEM: "CAMPTS",
 }
 
 # Agreed campaign progression bands. They are recorded separately from the
@@ -51,7 +53,7 @@ MAP_TIERS = (
 PROGRESSION_ITEMS = tuple(HERO_ITEMS) + tuple(DEFENSE_ITEMS) + tuple(ABILITY_ITEMS) + tuple(MAP_ITEMS)
 XP_FILLER_ITEM = "Two Hero Levels"
 MANA_FILLER_ITEM = "25,000 Bank Mana"
-FILLER_ITEMS = (XP_FILLER_ITEM, MANA_FILLER_ITEM)
+FILLER_ITEMS = tuple(XP_REWARDS) + tuple(MANA_REWARDS)
 # Keep the retired prototype filler in the table so its numeric ID can never
 # be reinterpreted as a real reward when an old test seed reconnects.
 LEGACY_NOTHING_ITEM = "Nothing"
@@ -185,7 +187,10 @@ V040_ITEM_NAMES = (
     "Shield Bash (Guardian)",
     "Divine Judgement (Guardian)",
 )
-ALL_ITEM_NAMES = LEGACY_ITEM_NAMES + V040_ITEM_NAMES
+V050_ITEM_NAMES = (tuple(DIFFICULTY_ITEMS.values()) + tuple(MODE_ITEMS.values())
+                  + tuple(n for n in FILLER_ITEMS if n not in LEGACY_ITEM_NAMES)
+                  + (SUMMIT_MAP_ITEM, PROGRESSIVE_DIFFICULTY))
+ALL_ITEM_NAMES = LEGACY_ITEM_NAMES + V040_ITEM_NAMES + V050_ITEM_NAMES
 if len(set(ALL_ITEM_NAMES)) != len(ALL_ITEM_NAMES) or set(PROGRESSION_ITEMS) - set(ALL_ITEM_NAMES):
     raise ValueError("Every catalog item needs exactly one permanent, append-only item ID.")
 ITEM_NAME_TO_ID = {name: ITEM_ID_BASE + index for index, name in enumerate(ALL_ITEM_NAMES)}
@@ -220,10 +225,10 @@ GENERIC_DAMAGE_DEFENSES = frozenset(hero.item_name(tool) for hero in HEROES
                                     for tool in hero.defenses if tool.generic_damage)
 
 
-def progression_items_for_heroes(values) -> tuple[str, ...]:
+def progression_items_for_heroes(values, *, include_summit=False) -> tuple[str, ...]:
     """The selected kits only; catalog IDs remain available for old received items."""
     selected = tuple(HERO_BY_KEY[key] for key in normalize_hero_keys(values))
     return (tuple(hero.name for hero in selected)
             + tuple(hero.item_name(tool) for hero in selected for tool in hero.defenses)
             + tuple(hero.item_name(tool) for hero in selected for tool in hero.abilities)
-            + tuple(MAP_ITEMS))
+            + tuple(n for n in MAP_ITEMS if include_summit or n != SUMMIT_MAP_ITEM))

@@ -17,10 +17,10 @@ var array<APButtonGuard> APButtonGuards;
 
 function APUnlockState GetMenuUnlockState()
 {
-    local APGameInfo APGame;
+    local APGameRuntime APGame;
 
     if(GetCurrentWorldInfo() != none)
-        APGame = APGameInfo(GetCurrentWorldInfo().Game);
+        APGame = class'APGameRuntime'.static.GetForWorld(GetCurrentWorldInfo());
     // Use the live snapshot, not the startup object's copy, during play.
     if(APGame != none)
         return APGame.UnlockState;
@@ -136,10 +136,91 @@ function bool APHeroButtonClicked(UIScreenObject Sender, int PlayerIndex)
         ShowHeroBlockReason(Reason, APButtonGuards[Index].Scene.PlayerOwner);
         return true;
     }
+    // These two buttons normally dispatch to the owning scene. Call that
+    // scene directly after authorization so a copied widget delegate cannot
+    // retain a template or a previous scene instance as its target.
+    if(UI_HeroSelection(APButtonGuards[Index].Scene) != none ||
+        UI_SwapHero(APButtonGuards[Index].Scene) != none)
+        return APButtonGuards[Index].Scene.NotifyWidgetClicked(UIObject(Sender));
     OriginalClick = APButtonGuards[Index].OriginalClick;
     if(OriginalClick != none)
         return OriginalClick(Sender, PlayerIndex);
+    // A default widget delegate may have no stored target. Keep DD1's normal
+    // widget-to-scene dispatch in that case instead of dropping the click.
+    if(UIScriptWidget_Button(Sender) != none)
+        return UIScriptWidget_Button(Sender).ButtonClicked(Sender, PlayerIndex);
     return false;
+}
+
+function SetAPButtonEnabled(UIObject Button, bool bEnabled, int PlayerIndex)
+{
+    // SetEnabled changes the UI state stack. Reapplying it while a mouse
+    // button is held can discard the pressed state before the release click.
+    // Compare this widget only; a modal parent must not trigger repeated resets.
+    if(Button != none && Button.IsEnabled(PlayerIndex, false) != bEnabled)
+        Button.SetEnabled(bEnabled, PlayerIndex);
+}
+
+function UpdateMapMenuNavigation(UI_GameSetup Scene)
+{
+    local int PlayerIndex;
+    local int DifficultyIndex;
+    local APGameRuntime APGame;
+    local CampaignLevelEntryObject SelectedEntry;
+    local bool bSurvivalAllowed;
+    if(Scene == none || Scene.MapDataList == none)
+        return;
+    PlayerIndex = Scene.GetPlayerOwnerIndex();
+    // Stock DD1 updates tabs from the selected map. An empty category has no
+    // selection, leaving Campaign disabled from the previous category.
+    SetAPButtonEnabled(Scene.CampaignMissions, Scene.showingSpecialMissions ||
+        Scene.showingDLCCampaign || Scene.showingModMissions ||
+        Scene.showingLostMissions, PlayerIndex);
+    SetAPButtonEnabled(Scene.SpecialMissions, !Scene.showingSpecialMissions ||
+        Scene.showingLostMissions, PlayerIndex);
+    SetAPButtonEnabled(Scene.DLCCampaignMissions, !Scene.showingDLCCampaign, PlayerIndex);
+    SetAPButtonEnabled(Scene.ModMissions, !Scene.showingModMissions, PlayerIndex);
+    SetAPButtonEnabled(Scene.LostQuestsButton, !Scene.showingLostMissions, PlayerIndex);
+    // Leave Go to DD1. Its launch handler already requires a selected map;
+    // disabling it for an empty tab persists because selection never re-enables it.
+    APGame = class'APGameRuntime'.static.GetForWorld(Scene.GetWorldInfo());
+    if(APGame == none || APGame.UnlockState == none)
+        return;
+    for(DifficultyIndex = 0; DifficultyIndex < Scene.DifficultyButtons.Length; DifficultyIndex++)
+    {
+        if(Scene.DifficultyButtons[DifficultyIndex] != none)
+            SetAPButtonEnabled(Scene.DifficultyButtons[DifficultyIndex],
+                APGame.UnlockState.IsDifficultyUnlocked(Scene.DifficultyButtons[DifficultyIndex].CustomDataTwo), PlayerIndex);
+    }
+    // Fresh profiles default to Medium. Disabling its button does not change
+    // the selection; use DD1's setter to synchronize the menu and game settings.
+    if(APGame.UnlockState.IsDifficultyUnlocked(0) &&
+        !APGame.UnlockState.IsDifficultyUnlocked(int(Scene.CurrentDifficulty)))
+        Scene.SetDifficulty(EGD_EASY);
+    if(Scene.MapDataList.GetSelectedButton() == none)
+        return;
+    SelectedEntry = CampaignLevelEntryObject(Scene.MapDataList.GetSelectedButton().MyDataListEntry);
+    if(SelectedEntry == none)
+        return;
+    bSurvivalAllowed = Left(SelectedEntry.MyLevelEntry.EntryIdentifierTag, 4) == "CAMP" &&
+        APGame.UnlockState.IsMapUnlocked(SelectedEntry.MyLevelEntry.EntryIdentifierTag);
+    if(Scene.SurvivalCheckBox != none)
+    {
+        Scene.SurvivalCheckBox.SetVisibility(bSurvivalAllowed);
+        SetAPButtonEnabled(Scene.SurvivalCheckBox, bSurvivalAllowed &&
+            (APGame.UnlockState.ModeMask & 1) != 0, PlayerIndex);
+    }
+    if(Scene.SurvivalModePanel != none)
+        Scene.SurvivalModePanel.SetVisibility(bSurvivalAllowed);
+    SetAPButtonEnabled(Scene.InfiniteWaveCheckbox, bSurvivalAllowed &&
+        (APGame.UnlockState.ModeMask & 1) != 0, PlayerIndex);
+    if(Scene.PureStrategyCheckbox != none)
+        Scene.PureStrategyCheckbox.SetVisibility(false);
+    // This check pack starts at wave one, so do not offer a misleading skip.
+    if(Scene.StartAtWaveIncreaseButton != none)
+        Scene.StartAtWaveIncreaseButton.SetVisibility(false);
+    if(Scene.StartAtWaveDecreaseButton != none)
+        Scene.StartAtWaveDecreaseButton.SetVisibility(false);
 }
 
 function int GetInstantHeroOffset(name Key)
@@ -269,6 +350,7 @@ function UpdateHeroMenuGuards()
     Scenes = GetActiveUIScenesFromClass(class'DunDefUIScene');
     foreach Scenes(Scene)
     {
+        UpdateMapMenuNavigation(UI_GameSetup(Scene));
         Selection = UI_HeroSelection(Scene);
         Swap = UI_SwapHero(Scene);
         Creation = UI_CreateHero(Scene);
@@ -281,7 +363,7 @@ function UpdateHeroMenuGuards()
             // Restore the button on live AP unlock without mutating the hero list.
             bVanillaAllowed = Hero != none &&
                 (Hero.ActivePlayer == none || Hero.ActivePlayer == Scene.PlayerOwner);
-            Selection.ConfirmButton.SetEnabled(bVanillaAllowed &&
+            SetAPButtonEnabled(Selection.ConfirmButton, bVanillaAllowed &&
                 GetHeroBlockReason(Hero, false) == "", Scene.GetPlayerOwnerIndex());
         }
         else if(Swap != none && Swap.HeroDataList != none && Swap.SwapButton != none)
@@ -291,7 +373,7 @@ function UpdateHeroMenuGuards()
             bVanillaAllowed = Hero != none &&
                 Hero != Swap.GetHeroManager().GetActiveHero(Scene.PlayerOwner) &&
                 (Hero.ActivePlayer == none || Hero.ActivePlayer == Scene.PlayerOwner);
-            Swap.SwapButton.SetEnabled(bVanillaAllowed &&
+            SetAPButtonEnabled(Swap.SwapButton, bVanillaAllowed &&
                 GetHeroBlockReason(Hero, false) == "", Scene.GetPlayerOwnerIndex());
         }
         else if(Creation != none)

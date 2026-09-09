@@ -1,4 +1,4 @@
-class APGameReplicationInfo extends DunDefGameReplicationInfo;
+class APGRITreasure extends DunDefGRI_GoldenTokens;
 
 var int LastAPCompletedWave;
 var array<string> ReportedUnknownAPActions;

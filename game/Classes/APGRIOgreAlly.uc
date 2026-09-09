@@ -1,4 +1,4 @@
-class APGameReplicationInfo extends DunDefGameReplicationInfo;
+class APGRIOgreAlly extends DunDefGRI_OgreAlly;
 
 var int LastAPCompletedWave;
 var array<string> ReportedUnknownAPActions;

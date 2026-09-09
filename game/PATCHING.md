@@ -1,45 +1,39 @@
-# Building 0.4.0
+# Building 0.5.0
 
-The Python world/client is built separately from the game mod. Run
-`python tools/build_apworld.py` from this source checkout. It creates
-`dist/dungeon_defenders.apworld` without installing anything. The packaged Python
-files and YAML are exact copies of this source.
+Run `python tools/build_apworld.py` from this source folder to build
+`dist/dungeon_defenders.apworld`. It does not install anything. The Python files
+and bundled YAML are copied unchanged from this source.
 
-The game uses regular DD1's unmodified 64-bit executable with
-`-TOTALCONVERSION=DD1ArchipelagoCurrent`. Only Local mode is supported.
-DDDK is used by developers to compile/cook the mod, not by players to run it.
+Players use regular Steam DD1, with `-TOTALCONVERSION=DD1ArchipelagoCurrent`.
+The game executable is not modified. The mod only supports Local play.
 
-The tested development TC was named `DD1RetailFull040`. Its layout was:
+The game scripts were compiled and cooked using a compatible DDDK installation:
 
 ```
-TotalConversions/DD1RetailFull040/
-  ProbeSource/DD1Archipelago/Classes/   files from game/Classes
-  Script/                             matching compiled game dependencies
-  Config/                             TC build configuration
+TotalConversions/DD1Features050/
+  ProbeSource/DD1Archipelago/Classes/   game/Classes and game/BuildOnly
+  Script/                             matching compiled dependencies
+  Config/                             game/BuildConfig
 ```
 
-The build also contained `game/BuildOnly/APRetailMenuProbe.uc`, an unused
-diagnostic subclass. It is included here because it was compiled into the
-tested package. The release selects APViewportClient, not that diagnostic.
-
-From the compatible development installation's Binaries/Win64 folder:
+From the development installation's Binaries/Win64 folder:
 
 ```
-DunDefDevelopment.exe make -TOTALCONVERSION=DD1RetailFull040 -unattended -nopause -forcelogflush
-DunDefDevelopment.exe CookPackages DD1Archipelago -platform=PCConsole -TOTALCONVERSION=DD1RetailFull040 -languageforcooking=INT -noloccooking -unattended -nopause -forcelogflush
+DunDefDevelopment.exe make -TOTALCONVERSION=DD1Features050 -unattended -nopause -forcelogflush
+DunDefDevelopment.exe CookPackages DD1Archipelago -platform=PCConsole -TOTALCONVERSION=DD1Features050 -languageforcooking=INT -noloccooking -unattended -nopause -forcelogflush
 ```
 
-The build INIs point EditPackagesInPath at ProbeSource, outputs at Script, and
-include DD1Archipelago in EditPackages, NonNativePackages and startup packages.
-Use a backed-up development TC: `make` can remove precompiled dependency
-packages whose source is absent. Restore the same dependencies before cooking,
-without replacing the newly compiled DD1Archipelago.u.
+Back up the build first. The compiler can remove compiled dependencies when
+their source is absent. Restore those same dependencies before cooking, but
+keep the newly compiled DD1Archipelago.u.
 
-The AP code is inside the cooked Startup_INT.upk. Its matching TC texture and
-shader caches are included for correct graphics. Other cooked dependencies
-come from the regular game. No executable, DLL, save or video is in this release.
-Game content remains third-party content, not newly authored AP source.
+The AP scripts are in Startup_INT.upk. Ship its matching TC texture/shader caches
+and the working stock dependencies. The player Config files are in release/Config;
+they differ from the developer build paths. APRetailMenuProbe is an unused
+build-only class retained here because it is present in the compiled package.
+The release selects APViewportClient, not that probe.
 
-The release manifest lists file hashes. The AP class sources were compared with
-the compilation inputs. This is not a claim that every bundled game dependency
-can be rebuilt byte-for-byte from the current Steam DDDK source alone.
+The manifests record the source and release hashes. No executables, DLLs,
+character saves or videos are included. Bundled game content remains third-party
+content; this is not a claim that every stock dependency can be rebuilt from
+the current DDDK source alone.

@@ -160,7 +160,7 @@ HEROES = (
 HERO_BY_KEY = {hero.key: hero for hero in HEROES}
 DEFAULT_HERO_KEYS = ("apprentice", "squire", "huntress", "monk")
 MIN_ACTIVE_HEROES = 2
-MAX_ACTIVE_HEROES = 8
+MAX_ACTIVE_HEROES = 16
 ITEM_CHECK_COUNT = 83
 SUMMIT_FILLER_COUNT = 6
 PLACED_MAP_COUNT = 10
@@ -202,24 +202,9 @@ def validate_roster(values: str | Iterable[str], *,
     keys = normalize_hero_keys(values)
     if not MIN_ACTIVE_HEROES <= len(keys) <= MAX_ACTIVE_HEROES:
         raise ValueError(f"Choose {MIN_ACTIVE_HEROES} to {MAX_ACTIVE_HEROES} different active heroes.")
-    families: dict[str, Hero] = {}
-    for key in keys:
-        hero = HERO_BY_KEY[key]
-        if hero.family in families:
-            raise ValueError(f"Choose either {families[hero.family].name} or {hero.name}, not both.")
-        families[hero.family] = hero
     if not any(HERO_BY_KEY[key].builder for key in keys):
         raise ValueError("Choose at least one hero who builds defenses or minions.")
-    # Validate the largest pool before drawing a starter: Summoner's free minion
-    # must never cause a roster to be accepted only when he wins the starter roll.
-    progression = roster_progression_count(keys)
-    capacity = ITEM_CHECK_COUNT - SUMMIT_FILLER_COUNT
-    if progression > capacity:
-        raise ValueError(
-            f"This roster needs {progression} unlock rewards, but only {capacity} fit "
-            f"before The Summit's {SUMMIT_FILLER_COUNT} filler-only checks. "
-            "Choose fewer heroes or a smaller combined hero kit."
-        )
+    # The world validates the selected check budget before drawing a starter.
     if starter_readiness is not None:
         pending = [HERO_BY_KEY[key].name for key in keys if not starter_readiness.get(key, False)]
         if pending:

@@ -5,6 +5,7 @@ class APEventBridge extends Info config(DD1ArchipelagoBridgeDiagnostics);
 var config array<string> PendingEvents;
 var private bool bBridgeReady;
 var config string LastEventWriteStatus;
+var config string LastMissionSummary;
 
 function bool Initialize()
 {
@@ -16,20 +17,39 @@ function bool Initialize()
     bBridgeReady = true;
     LastEventWriteStatus = "ready_local_journal";
     PersistJournal();
+    SetTimer(4.0, false, 'RecordMissionSummary');
     return true;
+}
+
+function RecordMissionSummary()
+{
+    local DunDefGameReplicationInfo GRI;
+    local string MissionTag;
+    GRI = DunDefGameReplicationInfo(WorldInfo.GRI);
+    if(GRI == none)
+        return;
+    MissionTag = class'DunDefHeroManager'.static.GetHeroManager().GetCurrentCampaignLevelEntry().EntryIdentifierTag;
+    LastMissionSummary = "0.5.0|" $ MissionTag $ "|" $ WorldInfo.Game.Class $ "|" $ GRI.Class $
+        "|start=" $ GRI.TheStartWave $ "|wave=" $ GRI.WaveNumber $ "|final=" $ GRI.FinalWaveNumber $
+        "|survival=" $ GRI.IsInfiniteWaveMode $ "|challenge=" $ GRI.bIsSpecialMission;
+    default.LastMissionSummary = LastMissionSummary;
+    SaveConfig();
 }
 
 function EmitEvent(string EventType, string MapName, int WaveNumber, string Detail)
 {
-    local APGameInfo APGame;
+    local APGameRuntime APGame;
     local string Payload;
+    local string Mode;
+    local string MissionTag;
+    local DunDefGameReplicationInfo GRI;
 
     if(!bBridgeReady)
     {
         return;
     }
 
-    APGame = APGameInfo(WorldInfo.Game);
+    APGame = class'APGameRuntime'.static.GetForWorld(WorldInfo);
     if(APGame == none || !APGame.CanEmitAPGameplayEvents())
     {
         `warn("AP:BRIDGE_EVENT_BLOCKED reason=hero_permissions_unavailable event=" $ EventType);
@@ -42,8 +62,13 @@ function EmitEvent(string EventType, string MapName, int WaveNumber, string Deta
         return;
     if(InStr(MapName, "|") != -1 || InStr(Detail, "|") != -1)
         return;
+    GRI = DunDefGameReplicationInfo(WorldInfo.GRI);
+    if(GRI == none || GRI.bIsPureStrategy)
+        return;
+    MissionTag = class'DunDefHeroManager'.static.GetHeroManager().GetCurrentCampaignLevelEntry().EntryIdentifierTag;
+    Mode = GRI.bIsSpecialMission ? "challenge" : (GRI.IsInfiniteWaveMode ? "survival" : "campaign");
     Payload = APGame.UnlockState.SeedIdentity $ "|" $ EventType $ "|" $
-        MapName $ "|" $ WaveNumber $ "|" $ Detail;
+        MapName $ "|" $ WaveNumber $ "|" $ Detail $ "|" $ Mode $ "|" $ MissionTag;
     if(PendingEvents.Find(Payload) != INDEX_NONE)
         return;
     PendingEvents.AddItem(Payload);

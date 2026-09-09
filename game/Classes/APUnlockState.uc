@@ -12,6 +12,8 @@ var config array<string> UnlockedAbilities;
 var config array<string> UnlockedMaps;
 var config int MaxEquipmentQuality;
 var config int ExperienceMultiplier;
+var config int DifficultyMask;
+var config int ModeMask;
 
 function bool ContainsValue(const out array<string> Values, string Wanted)
 {
@@ -495,17 +497,29 @@ function bool IsBasicAbility(DunDefPlayerAbility Ability, string HeroKey)
 
 function bool IsMapUnlocked(string CampaignTag)
 {
+    if(Left(CampaignTag, 4) == "SPEC")
+        return (ModeMask & 2) != 0 && IsRandomizerMap(CampaignTag) &&
+            ContainsValue(UnlockedMaps, "CAMP" $ Mid(CampaignTag, 4));
     return ContainsValue(UnlockedMaps, CampaignTag);
 }
 
 function bool IsRandomizerMap(string CampaignTag)
 {
+    if(Left(CampaignTag, 4) == "SPEC")
+        CampaignTag = "CAMP" $ Mid(CampaignTag, 4);
     return CampaignTag == "CAMPDW" || CampaignTag == "CAMPFF" ||
         CampaignTag == "CAMPMQ" || CampaignTag == "CAMPAL" ||
         CampaignTag == "CAMPSQ" || CampaignTag == "CAMPCA" ||
         CampaignTag == "CAMPHC" || CampaignTag == "CAMPTR" ||
         CampaignTag == "CAMPRG" || CampaignTag == "CAMPRP" ||
         CampaignTag == "CAMPES" || CampaignTag == "CAMPTS";
+}
+
+function bool IsDifficultyUnlocked(int Difficulty)
+{
+    if(Difficulty < 0 || Difficulty > 3)
+        return false;
+    return (DifficultyMask & (1 << Difficulty)) != 0;
 }
 
 function string GetStartingHeroDisplayName()

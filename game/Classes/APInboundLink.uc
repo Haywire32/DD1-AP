@@ -1,13 +1,13 @@
 class APInboundLink extends TcpLink;
 
-var APGameInfo OwnerGame;
+var APGameRuntime OwnerGame;
 var int BridgePort;
 var bool bHasBoundPort;
 var float LastResponseTime;
 var bool bSnapshotAccepted;
 var string LastSentEvent;
 
-function Initialize(APGameInfo NewOwner)
+function Initialize(APGameRuntime NewOwner)
 {
     OwnerGame = NewOwner;
     LinkMode = MODE_Line;
@@ -70,7 +70,7 @@ event Opened()
     LastSentEvent = "";
     LastResponseTime = WorldInfo.RealTimeSeconds;
     `log("AP:LIVE_LINK_CONNECTED address=127.0.0.1 port=" $ BridgePort);
-    SendText("DD1HELLO3");
+    SendText("DD1HELLO4");
 }
 
 function SendPendingEvent()
@@ -80,7 +80,7 @@ function SendPendingEvent()
         return;
     LastSentEvent = OwnerGame.EventBridge.NextPendingEvent(OwnerGame.UnlockState.SeedIdentity);
     if(LastSentEvent != "")
-        SendText("DD1EVENT1|" $ LastSentEvent);
+        SendText("DD1EVENT2|" $ LastSentEvent);
 }
 
 event ReceivedLine(string Line)
@@ -88,7 +88,7 @@ event ReceivedLine(string Line)
     LastResponseTime = WorldInfo.RealTimeSeconds;
     if(Line == "DD1PONG1")
         return;
-    if(Left(Line, 8) == "DD1ACK1|")
+    if(Left(Line, 8) == "DD1ACK2|")
     {
         if(bSnapshotAccepted && LastSentEvent != "" && Mid(Line, 8) == LastSentEvent &&
             OwnerGame != none && OwnerGame.EventBridge != none && WorldInfo.NetMode == NM_Standalone)

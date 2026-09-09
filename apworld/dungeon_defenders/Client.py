@@ -20,7 +20,9 @@ from CommonClient import CommonContext, get_base_parser, gui_enabled, server_loo
 from NetUtils import ClientStatus
 
 from .dd1_ap_adapter import ingest_received_packet, reconcile_locations
-from .dd1_bridge_service import live_seed_identity, receive_live_event
+from .dd1_bridge_service import live_seed_identity
+from .dd1_events050 import receive_live_event, recover_victories
+from .dd1_content import ContentSettings, XP_REWARDS, MANA_REWARDS, PROGRESSIVE_DIFFICULTY, MODE_ITEMS
 from .dd1_install import find_retail_root, validate_retail_install
 from .items import DEFENSE_ITEMS, ITEM_ID_TO_UNLOCK, ITEM_NAME_TO_ID, MANA_FILLER_ITEM, XP_FILLER_ITEM
 from .heroes import DEFAULT_HERO_KEYS, validate_roster
@@ -40,7 +42,7 @@ from .dd1_protocol import (
 
 
 GAME_NAME = "Dungeon Defenders"
-STATE_DATA_VERSION = 2
+STATE_DATA_VERSION = 3
 LIVE_BRIDGE_HOST = "127.0.0.1"
 LIVE_BRIDGE_PORT = 38282
 GAME_CONNECT_TIMEOUT = 60.0
@@ -185,8 +187,9 @@ class DungeonDefendersContext(CommonContext):
             raise ProtocolError("server did not provide a seed name")
         slot_name = self.player_names.get(self.slot, self.auth or str(self.slot))
         version = slot_data.get("dd1_slot_data_version", 1)
-        if isinstance(version, bool) or not isinstance(version, int) or not 0 <= version <= STATE_DATA_VERSION:
-            raise ProtocolError("invalid DD1 slot-data version")
+        if type(version) is not int or version != STATE_DATA_VERSION:
+            raise ProtocolError("0.5.0 requires a new seed generated with the 0.5.0 world.")
+        ContentSettings.from_slot_data(slot_data)
         self._active_heroes(slot_data)
         filename = (
             f"{safe_filename(self.seed_name)}-team{self.team}-"
@@ -202,6 +205,7 @@ class DungeonDefendersContext(CommonContext):
             slot_data_version=version,
         )
         state["summit_settings"] = summit_settings(slot_data)
+        state["content_settings"] = ContentSettings.from_slot_data(slot_data).slot_data()
         # Retail completion events are explicitly seed-bound. Never import
         # older, unbound DDDK event files into a regular-DD1 seed.
         atomic_write_json(self.state_path, state)
@@ -294,7 +298,7 @@ class DungeonDefendersContext(CommonContext):
         self, revision: int, unlocked: dict[str, set[str]], xp_rewards: int, mana_rewards: int
     ) -> str:
         fields = (
-            "APSTATE4",
+            "APSTATE5",
             self._live_seed_identity(),
             str(revision),
             self._snapshot_field(unlocked["heroes"]),
@@ -307,6 +311,8 @@ class DungeonDefendersContext(CommonContext):
             self._snapshot_field(set(self._active_heroes(self.slot_data))),
             str(self.slot_data.get("experience_multiplier", 1)),
             self._snapshot_field(set(self.slot_data.get("level_six_heroes", []))),
+            str(self.difficulty_mask),
+            str(self.mode_mask),
         )
         return "|".join(fields) + "\r\n"
 
@@ -338,9 +344,9 @@ class DungeonDefendersContext(CommonContext):
         connected = False
         try:
             greeting = await asyncio.wait_for(reader.readline(), GAME_HANDSHAKE_TIMEOUT)
-            if greeting.rstrip(b"\r\n") != b"DD1HELLO3":
-                if greeting.rstrip(b"\r\n") in {b"DD1HELLO1", b"DD1HELLO2"}:
-                    logger.error("The running game mod is older than this client. Install the matching 0.4.0 game files before playing this seed.")
+            if greeting.rstrip(b"\r\n") != b"DD1HELLO4":
+                if greeting.rstrip(b"\r\n") in {b"DD1HELLO1", b"DD1HELLO2", b"DD1HELLO3"}:
+                    logger.error("Install the matching 0.5.0 game files before playing this seed.")
                     return
                 logger.warning("Ignored a localhost connection that was not the DD1 mod.")
                 return
@@ -356,7 +362,7 @@ class DungeonDefendersContext(CommonContext):
                 if line.rstrip(b"\r\n") == b"DD1PING1":
                     writer.write(b"DD1PONG1\r\n")
                     await writer.drain()
-                elif line.startswith(b"DD1EVENT1|") and self.state_path is not None:
+                elif line.startswith(b"DD1EVENT2|") and self.state_path is not None:
                     ack, changed = receive_live_event(line, self.state_path, self._live_seed_identity())
                     if changed:
                         self._queue_unlock_write()
@@ -447,18 +453,27 @@ class DungeonDefendersContext(CommonContext):
                 owner = key if category == "heroes" else key.split(".")[0]
                 if category == "maps" or owner in active_heroes:
                     unlocked[category].add(key)
-        xp_rewards = sum(
-            received["item_id"] == ITEM_NAME_TO_ID[XP_FILLER_ITEM]
-            for received in state["received_items"]
-        )
-        mana_rewards = sum(
-            received["item_id"] == ITEM_NAME_TO_ID[MANA_FILLER_ITEM]
-            for received in state["received_items"]
-        )
-        settings = summit_settings(self.slot_data)
+        xp_values = {ITEM_NAME_TO_ID[n]: amount for n, amount in XP_REWARDS.items()}
+        mana_values = {ITEM_NAME_TO_ID[n]: amount // 25000 for n, amount in MANA_REWARDS.items()}
+        xp_rewards = sum(xp_values.get(r["item_id"], 0) for r in state["received_items"])
+        mana_rewards = sum(mana_values.get(r["item_id"], 0) for r in state["received_items"])
+        content = ContentSettings.from_slot_data(self.slot_data)
+        received_ids = {r["item_id"] for r in state["received_items"]}
+        # Recompute from the persisted indexed item history, not receipt callbacks:
+        # reconnects cannot advance the tier twice, and extra copies stop at Insane.
+        difficulty_count = min(3, sum(r['item_id'] == ITEM_NAME_TO_ID[PROGRESSIVE_DIFFICULTY]
+                                    for r in state['received_items']))
+        self.difficulty_mask = (1 << (difficulty_count + 1)) - 1 if content.difficulty_unlocks else 15
+        self.mode_mask = 0
+        for bit, required, name in ((1, content.survival_unlock, MODE_ITEMS['survival']),
+                                    (2, content.challenge_unlock, MODE_ITEMS['challenge'])):
+            if not required or ITEM_NAME_TO_ID[name] in received_ids:
+                self.mode_mask |= bit
         victories = set(state["observed_locations"]) | set(state.get("victory_history", {}))
-        if summit_is_unlocked(victories, settings["summit_required_maps"], settings["summit_unlock_difficulty"]):
+        if content.summit_unlocked(unlocked["maps"], victories):
             unlocked["maps"].add("CAMPTS")
+        else:
+            unlocked["maps"].discard("CAMPTS")
         slot_name = self.player_names.get(self.slot, self.auth or str(self.slot))
         # A map clear can unlock The Summit even when its AP item is sent to
         # somebody else. Such local progress must refresh the game on its own.
@@ -478,6 +493,8 @@ class DungeonDefendersContext(CommonContext):
             experience_multiplier=self.slot_data.get("experience_multiplier", 1),
             active_heroes=active_heroes,
             seed_identity=self._live_seed_identity(),
+            difficulty_mask=self.difficulty_mask,
+            mode_mask=self.mode_mask,
         )
         self.live_snapshot = self._make_live_snapshot(
             revision, unlocked, xp_rewards, mana_rewards
@@ -501,14 +518,13 @@ class DungeonDefendersContext(CommonContext):
         await self.send_msgs([
             {"cmd": "StatusUpdate", "status": ClientStatus.CLIENT_GOAL}
         ])
-        logger.info("Dungeon Defenders goal complete: The Summit defeated on %s or higher.",
-                    ("Easy", "Medium", "Hard", "Insane")[summit_settings(self.slot_data)["summit_goal_difficulty"]])
+        logger.info("Dungeon Defenders goal complete: %s.", self.slot_data['completion_goal'])
 
     async def _reconcile_checks(self) -> None:
         if self.state_path is None:
             return
         state = load_bridge_state(self.state_path)
-        recovered = recover_observed_victories(state, self.checked_locations)
+        recovered = recover_victories(state, self.checked_locations)
         safe_to_send, unknown = reconcile_locations(
             state,
             server_locations=self.server_locations,

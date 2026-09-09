@@ -71,7 +71,8 @@ function ApplyAPOnlineGuards()
     Menu = UI_MainMenu(GetActiveUISceneFromClass(class'UI_MainMenu'));
     if(Menu != none && Menu.MultiplayerButton != none)
     {
-        Menu.MultiplayerButton.SetEnabled(false, 0);
+        if(Menu.MultiplayerButton.IsEnabled(0, false))
+            Menu.MultiplayerButton.SetEnabled(false, 0);
         Menu.MultiplayerButton.OnClicked = RejectAPOnlineClick;
         // The menu's keyboard/controller handler can activate its focused
         // control directly, without going through the button's OnClicked.

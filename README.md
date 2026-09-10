@@ -2,19 +2,21 @@
 An Archipelago randomizer for Dungeon Defenders 1 on Steam.
 The mod randomizes available heroes, levels, defenses and abilities.
 The goal is to beat a set number of levels to unlock the "The Summit" and beat the boss.
+An alternative goal is to beat X amount of challenge maps.
 This mod is for Local play only.
 
 ### Current location checks
-- Complete a wave
-- Complete a level. One check for each difficulty: easy, medium, hard. Harder difficulties grants checks for the lower ones.
+- Complete a wave. One check for each difficulty: easy, medium, hard. Harder difficulties grants checks for the lower ones.
+- Supports all 12 campaign maps, survival, and challenge maps.
 
 ### Current items/rewards
 - Level access
-- The four basic heroes: Apprentice, Squire, Huntress and Monk
+- All 16 heroes are supported. DLC heroes require purchased DLC.
 - Defenses
 - Hero abilities
 - Experience points
 - Bank mana
+- Survival mode, challenge mode, difficulties
 
 ### Download
 You can find the [download here](https://github.com/Haywire32/DD1-AP/releases/tag/v0.5.1)
@@ -53,7 +55,7 @@ The current version is still unstable and most likely has bugs.
 
 ### Future plans and ideas
 - Game balance adjustments
-- More checks and rewards
+- More features
 
 ### Disclaimer
 AI assistance was used for reverse engineering and hook implementation. Item and logic mapping, in-game testing, verification, and design decisions were done manually by me.

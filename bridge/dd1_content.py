@@ -120,7 +120,7 @@ class ContentSettings:
         if not isinstance(data, Mapping):
             raise ValueError('DD1 slot settings must be an object.')
         if data.get('dd1_slot_data_version') != 5:
-            raise ValueError('Generate a new 0.5.0 seed for progressive difficulty unlocks (slot data version 5).')
+            raise ValueError('Generate a new seed after installing the matching APWorld (slot data version 5).')
         missing = set(cls.__dataclass_fields__) - data.keys()
         if missing:
             raise ValueError('DD1 slot data is missing: ' + ', '.join(sorted(missing)))

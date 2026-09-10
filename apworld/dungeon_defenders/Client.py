@@ -42,7 +42,7 @@ from .dd1_protocol import (
 
 
 GAME_NAME = "Dungeon Defenders"
-STATE_DATA_VERSION = 3
+STATE_DATA_VERSION = 5
 LIVE_BRIDGE_HOST = "127.0.0.1"
 LIVE_BRIDGE_PORT = 38282
 GAME_CONNECT_TIMEOUT = 60.0
@@ -188,7 +188,10 @@ class DungeonDefendersContext(CommonContext):
         slot_name = self.player_names.get(self.slot, self.auth or str(self.slot))
         version = slot_data.get("dd1_slot_data_version", 1)
         if type(version) is not int or version != STATE_DATA_VERSION:
-            raise ProtocolError("0.5.0 requires a new seed generated with the 0.5.0 world.")
+            raise ProtocolError(
+                f"This client requires DD1 slot-data version {STATE_DATA_VERSION}. "
+                "Install the matching APWorld and generate a new seed."
+            )
         ContentSettings.from_slot_data(slot_data)
         self._active_heroes(slot_data)
         filename = (

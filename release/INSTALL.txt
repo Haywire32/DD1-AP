@@ -1,4 +1,4 @@
-Dungeon Defenders Archipelago - version 0.5.0 playtest
+Dungeon Defenders Archipelago - version 0.5.1 playtest
 ================================================
 
 This mod is for Play Local only.

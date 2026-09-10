@@ -1,4 +1,4 @@
-# Building 0.5.0
+# Building 0.5.1
 
 Run `python tools/build_apworld.py` from this source folder to build
 `dist/dungeon_defenders.apworld`. It does not install anything. The Python files

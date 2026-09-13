@@ -8,6 +8,7 @@ This mod is for Local play only.
 ### Current location checks
 - Complete a wave. One check for each difficulty: easy, medium, hard. Harder difficulties grants checks for the lower ones.
 - Supports all 12 campaign maps, survival, and challenge maps.
+- Shopsanity in the tavern shop
 
 ### Current items/rewards
 - Level access
@@ -16,6 +17,7 @@ This mod is for Local play only.
 - Hero abilities
 - Experience points
 - Bank mana
+- Random gear drop
 - Survival mode, challenge mode, difficulties
 
 ### Download

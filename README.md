@@ -21,7 +21,7 @@ This mod is for Local play only.
 - Survival mode, challenge mode, difficulties
 
 ### Download
-You can find the [download here](https://github.com/Haywire32/DD1-AP/releases/tag/v0.6.0)
+You can find the [download here](https://github.com/Haywire32/DD1-AP/releases/tag/v0.6.1)
 
 # Installation guide
 ### Requirements

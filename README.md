@@ -6,7 +6,7 @@ An alternative goal is to beat X amount of challenge maps.
 This mod is for Local play only.
 
 ### Current location checks
-- Complete a wave. One check for each difficulty: easy, medium, hard. Harder difficulties grants checks for the lower ones.
+- Complete a wave. One check for each difficulty, from easy to ruthless based on settings.. Harder difficulties grants checks for the lower ones.
 - Supports all 12 campaign maps, survival, and challenge maps.
 - Shopsanity in the tavern shop
 
@@ -19,6 +19,8 @@ This mod is for Local play only.
 - Bank mana
 - Random gear drop
 - Survival mode, challenge mode, difficulties
+- Crystal skins
+- Progressive survival starting wave, defense units, build time
 
 ### Download
 You can find the [download here](https://github.com/Haywire32/DD1-AP/releases)
@@ -27,6 +29,7 @@ You can find the [download here](https://github.com/Haywire32/DD1-AP/releases)
 ### Requirements
 - Dungeon Defenders from Steam
 - Archipelago 0.6.7 or newer
+- DLC is required if you enable DLC heroes or nightmare/ruthless difficulty
 
 ### Mod install
 1. Double-click dungeon_defenders.apworld to install it.

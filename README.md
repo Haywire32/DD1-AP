@@ -1,9 +1,12 @@
 # Dungeon Defenders Archipelago
 An Archipelago randomizer for Dungeon Defenders 1 on Steam.
 The mod randomizes available heroes, levels, defenses and abilities.
-The goal is to beat a set number of levels to unlock the "The Summit" and beat the boss.
-An alternative goal is to beat X amount of challenge maps.
 This mod is for Local play only.
+
+### Current goals
+- Defeat a set amount of levels to unlock and beat The Summit
+- Defeat a set amount of challenge levels
+- Collect four eternia shards and beat Crystalline Dimension
 
 ### Current location checks
 - Complete a wave. One check for each difficulty, from easy to ruthless based on settings.. Harder difficulties grants checks for the lower ones.

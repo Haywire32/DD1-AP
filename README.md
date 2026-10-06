@@ -9,8 +9,8 @@ This mod is for Local play only.
 - Collect four eternia shards and beat Crystalline Dimension
 
 ### Current location checks
-- Complete a wave. One check for each difficulty, from easy to ruthless based on settings.. Harder difficulties grants checks for the lower ones.
-- Supports all 12 campaign maps, survival, and challenge maps.
+- Complete a wave. One check for each difficulty, from easy to ruthless based on settings. Harder difficulties grants checks for the lower ones.
+- Supports all 12 campaign maps, survival, and challenge maps. With CD goal it also supports several bonus maps.
 - Shopsanity in the tavern shop
 
 ### Current items/rewards

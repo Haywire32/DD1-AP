@@ -23,6 +23,7 @@ This mod is for Local play only.
 - Random gear drop
 - Survival mode, challenge mode, difficulties
 - Crystal skins
+- Hero costumes
 - Progressive survival starting wave, defense units, build time
 
 ### Download

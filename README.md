@@ -59,5 +59,10 @@ The current version is still unstable and most likely has bugs.
 - Game balance adjustments
 - More features
 
-### Disclaimer
-AI assistance was used for reverse engineering and hook implementation. Item and logic mapping, in-game testing, verification, and design decisions were done manually by me.
+### AI disclosure
+I’ve used ChatGPT/Codex for the APWorld, UnrealScript code, game integration and debugging. Much of the code was written by AI under my direction.
+
+I’ve also done a lot of manual work in the devkit DDDK. The gameplay design, options and balancing are directed by me, with feedback from players. I spend many hours playtesting, tweaking and retesting new features between updates.
+
+I review the code, but I’m not claiming to be an expert in every part of it. The source is public for anyone to look through. I’m responsible for what I release, helping players and fixing bugs.
+

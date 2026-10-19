@@ -1,11 +1,13 @@
-"""Locate regular Steam DD1 without scanning disks; retain legacy DDDK checks."""
+"""Validate a manually selected DD1 installation."""
 
 from __future__ import annotations
 
 import os
 import re
+import hashlib
+import json
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Callable, Optional
 
 
 DDDK_DIRECTORY = "DungeonDefendersDevelopmentKit"
@@ -19,16 +21,114 @@ DDDK_RUNTIME_DLLS = (
 DDDK_APP_ID = "216840"
 TC_DIRECTORY = "DD1ArchipelagoCurrent"
 RETAIL_EXECUTABLE = Path("Binaries") / "Win64" / "DunDefGame.exe"
+RETAIL_LAUNCH_FLAGS = ("-LANGUAGE=INT", "-windowed")
+# The conversion is cooked only in INT. -LANGUAGE takes precedence over the
+# native SystemSettings/GameLanguageOverride (including AUTO/OS language).
+# Do not rewrite the user's generated INI just to select the cooked language.
+REQUIRED_COOKED_FILES = (
+    "Core.upk", "Engine.upk", "GameFramework.upk", "UDKGame.upk", "IpDrv.upk",
+    "OnlineSubsystemSteamworks.upk", "DunDefEntry.upk", "DunDefTransition.upk",
+    "DunDefMiscNoMedia.upk", "EmptyRoom.upk", "Startup_INT.upk",
+    "TC_Textures.tfc", "TC_CharTextures.tfc", "GuidCache.upk",
+    "GlobalShaderCache-PC-D3D-SM3.bin", "RefShaderCache_TC_-PC-D3D-SM3.upk",
+)
+STARTUP_URL = {
+    "Protocol": "unreal", "Name": "Player", "Map": "DunDefEntry.udk",
+    "LocalMap": "DunDefEntry.udk", "TransitionMap": "DunDefTransition.udk",
+    "MapExt": "udk", "EXEName": "UDKGame.exe", "DebugEXEName": "DEBUG-UDKGame.exe",
+    "SaveExt": "usa", "Port": "7777", "GameName": "Dungeon Defenders",
+    "GameNameShort": "DunDef",
+}
 
 
-def validate_retail_install(root: Path) -> None:
+def read_unreal_ini(path: Path) -> str:
+    raw = path.read_bytes()
+    encoding = 'utf-16' if raw.startswith((b'\xff\xfe', b'\xfe\xff')) else 'utf-8-sig'
+    return raw.decode(encoding)
+
+
+def _tc_root(root: Path, tc_directory: str) -> Path:
+    if tc_directory not in (TC_DIRECTORY, "DD1ArchipelagoChaos"):
+        raise ValueError("Unknown DD1 conversion directory.")
+    return root / 'TotalConversions' / tc_directory
+
+
+def _ini_settings(path: Path) -> dict[tuple[str, str], str]:
+    try:
+        contents = read_unreal_ini(path)
+    except (OSError, UnicodeError) as error:
+        raise ValueError(f"Cannot read the DD1 mod configuration {path}. "
+                         "Keep a backup; restore this file from the matching package "
+                         "if it is a Default INI. Do not delete saves or the Config folder.") from error
+    if '\x00' in contents:
+        raise ValueError(f"DD1 mod configuration contains invalid NUL bytes: {path}. "
+                         "Keep a backup before repairing this file.")
+    result = {}
+    section = ''
+    for raw in contents.splitlines():
+        line = raw.strip()
+        if not line or line.startswith((';', '#', '//')):
+            continue
+        if line.startswith('[') and line.endswith(']'):
+            section = line[1:-1].strip().casefold()
+        elif '=' in line:
+            key, value = line.split('=', 1)
+            result[(section, key.strip().casefold())] = value.strip().strip('"').casefold()
+    return result
+
+
+def verify_conversion_package(root: Path, *, tc_directory: str = TC_DIRECTORY) -> str:
+    """Read-only integrity check for new packages; older packages remain supported.
+
+    This is an accidental corruption/mixed-install check, not a security signature.
+    The manifest contains immutable cooked files only, never saves or settings.
+    """
+    tc = _tc_root(root, tc_directory)
+    manifest = tc / 'package-manifest.json'
+    if not manifest.exists():
+        return 'legacy package (no integrity manifest)'
+    try:
+        if manifest.stat().st_size > 128_000:
+            raise ValueError('manifest too large')
+        data = json.loads(manifest.read_text(encoding='utf-8-sig'))
+        files = data['files']
+        if data.get('format') != 1 or not isinstance(files, dict) or not 1 <= len(files) <= 256:
+            raise ValueError('invalid manifest format')
+        if not {f'CookedPCConsole/{name}' for name in REQUIRED_COOKED_FILES} <= files.keys():
+            raise ValueError('manifest omits required cooked files')
+        for name, expected in files.items():
+            # Never follow manifest-controlled paths outside this exact asset folder.
+            if not re.fullmatch(r'CookedPCConsole/[A-Za-z0-9_.-]+\.(?:upk|tfc|bin)', name):
+                raise ValueError('invalid manifest path')
+            if not isinstance(expected, dict) or type(expected.get('size')) is not int or expected['size'] <= 0:
+                raise ValueError('invalid manifest size')
+            if not re.fullmatch(r'[0-9a-f]{64}', str(expected.get('sha256', ''))):
+                raise ValueError('invalid manifest hash')
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, UnicodeError) as error:
+        raise ValueError(f"Cannot verify DD1 mod package: {manifest}. "
+                         "Re-extract the full matching TotalConversions ZIP; keep saves and settings.") from error
+    for name, expected in files.items():
+        path = tc / name
+        if not path.resolve().is_relative_to(tc.resolve()):
+            raise ValueError(f"DD1 mod package points outside the conversion: {path}")
+        if not path.is_file() or path.stat().st_size != expected['size']:
+            raise ValueError(f"DD1 mod file is missing or incomplete: {path}. "
+                             "Re-extract the full matching TotalConversions ZIP and replace packaged files. "
+                             "Do not delete saves or the Config folder.")
+        with path.open('rb') as stream:
+            digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+        if digest != expected['sha256']:
+            raise ValueError(f"DD1 mod file differs from its package (mixed versions or damaged file): {path}. "
+                             "Re-extract the full matching TotalConversions ZIP and replace packaged files. "
+                             "Do not delete saves or the Config folder.")
+    return f'verified {len(files)} cooked files'
+
+
+def validate_retail_install(root: Path, *, tc_directory: str = TC_DIRECTORY) -> None:
     """Read-only preflight for the cooked, Local-only regular-DD1 conversion."""
-    tc = root / "TotalConversions" / TC_DIRECTORY
+    tc = _tc_root(root, tc_directory)
     required = [root / RETAIL_EXECUTABLE]
-    required += [tc / "CookedPCConsole" / name for name in (
-        "Startup_INT.upk", "TC_Textures.tfc", "TC_CharTextures.tfc",
-        "RefShaderCache_TC_-PC-D3D-SM3.upk",
-    )]
+    required += [tc / "CookedPCConsole" / name for name in REQUIRED_COOKED_FILES]
     for path in required:
         if not path.is_file() or not path.stat().st_size:
             raise FileNotFoundError(f"Regular DD1 mod installation is incomplete: {path}. "
@@ -40,17 +140,7 @@ def validate_retail_install(root: Path) -> None:
             # they must not override the mod with the ordinary game classes.
             if prefix == "UDK" and not path.exists():
                 continue
-            settings = {}
-            section = ""
-            for raw in path.read_text(encoding="utf-8-sig").splitlines():
-                line = raw.strip()
-                if not line or line.startswith((";", "#", "//")):
-                    continue
-                if line.startswith("[") and line.endswith("]"):
-                    section = line[1:-1].casefold()
-                elif "=" in line:
-                    key, value = line.split("=", 1)
-                    settings[(section, key.strip().casefold())] = value.strip().casefold()
+            settings = _ini_settings(path)
             expected = ({
                 ("engine.engine", "gameviewportclientclassname"): "dd1archipelago.apviewportclient",
                 ("onlinesubsystemsteamworks.onlinesubsystemsteamworks", "busevac"): "false",
@@ -62,44 +152,67 @@ def validate_retail_install(root: Path) -> None:
                 if settings.get(key) != value:
                     raise ValueError(f"Local-only DD1 mod configuration is not enabled in {path} ({key[1]}). "
                                      "Replace the mod configuration from the matching release before launching.")
+            if suffix == 'Engine':
+                # Default INIs are deltas with inheritance. Generated UDKEngine
+                # is a complete cache: missing URL fields there reproduce the
+                # broken configuration in the BearKat report. Do not treat it
+                # as another delta, and do not silently erase user preferences.
+                keys = ('Map', 'LocalMap') if prefix == 'Default' else (
+                    'Protocol', 'Map', 'LocalMap', 'TransitionMap', 'MapExt', 'Port')
+                bad = [key for key in keys if not settings.get(('url', key.casefold()))]
+                for key in ('Map', 'LocalMap'):
+                    value = settings.get(('url', key.casefold()), '')
+                    if value and value not in ('dundefentry', 'dundefentry.udk'):
+                        bad.append(key)
+                if bad:
+                    action = ("Install the corrected DefaultEngine.ini from the new package."
+                              if prefix == 'Default' else
+                              "Back up this file, then restore its [URL] startup entries from the "
+                              "package's DefaultEngine.ini. Do not replace the entire file if you "
+                              "want to keep your graphics settings.")
+                    raise ValueError(f"DD1 startup settings are missing or invalid in {path}: "
+                                     + ', '.join(bad) + '. ' + action +
+                                     " No files were changed. Do not delete saves or the Config folder.")
 
 
 def find_retail_root(explicit: Optional[Path] = None, *,
-                     steam_install_roots: Optional[Iterable[Path]] = None) -> Path:
-    """Use Steam's registered libraries or the user's explicit folder, never a disk scan."""
-    if explicit is not None:
-        root = Path(explicit).expanduser().resolve()
-        validate_retail_install(root)
-        return root
-    roots = list(steam_install_roots) if steam_install_roots is not None else _registered_steam_roots()
-    candidates = []
-    active = set()
-    for steam in _unique_paths(roots):
-        for library in _library_roots(steam):
-            installed = _manifest_install(library, "65800")
-            if installed is not None:
-                active.add(installed.resolve())
-                candidates.append(installed)
-            candidates.append(library / "steamapps" / "common" / "Dungeon Defenders")
-    valid, errors = [], []
-    for candidate in _unique_paths(candidates):
-        if not (candidate / RETAIL_EXECUTABLE).is_file():
-            continue
+                     tc_directory: str = TC_DIRECTORY) -> Path:
+    """Validate only the folder supplied by the player."""
+    if explicit is None:
+        raise ValueError("Select your Dungeon Defenders game folder.")
+    root = Path(explicit).expanduser().resolve()
+    validate_retail_install(root, tc_directory=tc_directory)
+    return root
+
+
+def select_retail_root(explicit: Optional[Path], settings_path: Path,
+                       choose_folder: Callable[[], Optional[str]], *,
+                       force_select: bool = False,
+                       tc_directory: str = TC_DIRECTORY) -> Optional[Path]:
+    """Remember a validated manual choice; cancellation changes nothing."""
+    if explicit is None and not force_select:
         try:
-            validate_retail_install(candidate)
-        except (OSError, ValueError) as error:
-            errors.append(str(error))
-        else:
-            valid.append(candidate.resolve())
-    preferred = [path for path in valid if path in active] or valid
-    if len(preferred) == 1:
-        return preferred[0]
-    if len(preferred) > 1:
-        raise ValueError("More than one regular DD1 mod installation was found. Select one with --game-root.")
-    if errors:
-        raise ValueError("No usable regular DD1 mod installation. " + " ".join(errors))
-    raise FileNotFoundError("Regular Dungeon Defenders with the AP conversion was not found in Steam's libraries. "
-                            "Install the conversion or select its game folder with --game-root.")
+            data = json.loads(settings_path.read_text(encoding="utf-8"))
+            saved = data.get("game_root") if isinstance(data, dict) and data.get("version") == 1 else None
+            if isinstance(saved, str) and saved and Path(saved).is_absolute():
+                return find_retail_root(Path(saved), tc_directory=tc_directory)
+        except (OSError, ValueError, UnicodeError):
+            pass
+    if explicit is None:
+        selected = choose_folder()
+        if not selected:
+            return None
+        explicit = Path(selected)
+    root = find_retail_root(explicit, tc_directory=tc_directory)
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = settings_path.with_suffix(".tmp")
+    try:
+        temporary.write_text(json.dumps({"version": 1, "game_root": str(root)}) + "\n",
+                             encoding="utf-8")
+        os.replace(temporary, settings_path)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return root
 
 
 def validate_dddk_install(root: Path) -> None:
@@ -153,7 +266,7 @@ def validate_dddk_install(root: Path) -> None:
     for filename, expected_settings in checks.items():
         path = root / "TotalConversions" / TC_DIRECTORY / "Config" / filename
         try:
-            contents = path.read_text(encoding="utf-8-sig")
+            contents = read_unreal_ini(path)
         except (OSError, UnicodeError) as error:
             raise ValueError(
                 f"Cannot read the DD1 mod configuration {path}: {error}. "
@@ -182,132 +295,10 @@ def validate_dddk_install(root: Path) -> None:
                 )
 
 
-def _manifest_install(library_root: Path, app_id: str = DDDK_APP_ID) -> Optional[Path]:
-    """Return Steam's installed copy, if its app manifest marks it installed."""
-    manifest = library_root / "steamapps" / f"appmanifest_{app_id}.acf"
-    try:
-        contents = manifest.read_text(encoding="utf-8-sig")
-        fields = dict(re.findall(r'"([^"\\]+)"\s*"([^"\\]*)"', contents))
-        if fields.get("appid") != app_id or not int(fields.get("StateFlags", "0")) & 4:
-            return None
-        directory = fields.get("installdir", "")
-        if not directory or directory in {".", ".."} or "/" in directory or "\\" in directory:
-            return None
-        return library_root / "steamapps" / "common" / directory
-    except (OSError, UnicodeError, ValueError):
-        return None
-
-
-def _unique_paths(paths: Iterable[Path]) -> list[Path]:
-    result: list[Path] = []
-    seen: set[str] = set()
-    for path in paths:
-        key = os.path.normcase(os.path.abspath(os.fspath(path)))
-        if key not in seen:
-            seen.add(key)
-            result.append(path)
-    return result
-
-
-def _registered_steam_roots() -> list[Path]:
-    roots: list[Path] = []
-    try:
-        import winreg
-
-        registry_locations = (
-            (winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam", "SteamPath"),
-            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Valve\Steam", "InstallPath"),
-            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Valve\Steam", "InstallPath"),
-        )
-        for hive, key_name, value_name in registry_locations:
-            try:
-                with winreg.OpenKey(hive, key_name) as key:
-                    value, _ = winreg.QueryValueEx(key, value_name)
-                if isinstance(value, str) and value:
-                    roots.append(Path(value))
-            except OSError:
-                pass
-    except ImportError:
-        pass
-
-    for environment_name in ("ProgramFiles(x86)", "ProgramFiles"):
-        program_files = os.environ.get(environment_name)
-        if program_files:
-            roots.append(Path(program_files) / "Steam")
-    roots.append(Path(r"C:\Program Files (x86)\Steam"))
-    return _unique_paths(roots)
-
-
-def _library_roots(steam_root: Path) -> list[Path]:
-    roots = [steam_root]
-    library_file = steam_root / "steamapps" / "libraryfolders.vdf"
-    try:
-        contents = library_file.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return roots
-
-    for match in re.finditer(r'"path"\s*"((?:\\.|[^"\\])*)"', contents):
-        value = match.group(1).replace(r"\\", "\\")
-        if value:
-            roots.append(Path(value))
-    return _unique_paths(roots)
-
-
-def _is_dddk_root(path: Path) -> bool:
-    return (path / DDDK_EXECUTABLE).is_file()
-
-
-def find_dddk_root(
-    explicit: Optional[Path] = None,
-    *,
-    steam_install_roots: Optional[Iterable[Path]] = None,
-) -> Path:
-    """Return the installed DDDK root or raise one concise error."""
-
-    if explicit is not None:
-        root = Path(explicit).expanduser()
-        validate_dddk_install(root)
-        return root.resolve()
-
-    steam_roots = (
-        list(steam_install_roots)
-        if steam_install_roots is not None
-        else _registered_steam_roots()
-    )
-    candidates: list[Path] = []
-    active_installs: set[Path] = set()
-    for steam_root in _unique_paths(Path(root) for root in steam_roots):
-        for library_root in _library_roots(steam_root):
-            active = _manifest_install(library_root)
-            if active is not None:
-                active_installs.add(active.resolve())
-                candidates.append(active)
-            candidates.append(
-                library_root / "steamapps" / "common" / DDDK_DIRECTORY
-            )
-    valid: list[Path] = []
-    invalid: list[str] = []
-    for candidate in _unique_paths(candidates):
-        if _is_dddk_root(candidate):
-            try:
-                validate_dddk_install(candidate)
-            except (OSError, ValueError) as error:
-                invalid.append(str(error))
-            else:
-                valid.append(candidate.resolve())
-    preferred = [candidate for candidate in valid if candidate in active_installs] or valid
-    if len(preferred) == 1:
-        return preferred[0]
-    if len(preferred) > 1:
-        raise ValueError(
-            "More than one Development Kit has the DD1 mod installed: "
-            + "; ".join(str(path) for path in preferred)
-            + ". Select one by launching this client with --dddk-root followed by its folder."
-        )
-    if invalid:
-        raise ValueError("No usable DD1 mod installation was found. " + " ".join(invalid))
-
-    raise FileNotFoundError(
-        "Dungeon Defenders Development Kit was not found in any Steam library. "
-        "Install it in Steam, or launch this client with --dddk-root followed by its folder."
-    )
+def find_dddk_root(explicit: Optional[Path] = None) -> Path:
+    """Validate an explicitly selected legacy Development Kit folder."""
+    if explicit is None:
+        raise ValueError("Select the Development Kit folder with --dddk-root.")
+    root = Path(explicit).expanduser().resolve()
+    validate_dddk_install(root)
+    return root

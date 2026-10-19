@@ -44,10 +44,23 @@ CAMPAIGN_MAPS = (
     CampaignMap("CAMPES", "DD_TheSpires", "Endless Spires"),
     CampaignMap("CAMPTS", "DD_Finale", "The Summit"),
     CampaignMap("CAMPGC", "DD_Caverns", "Glitterhelm Caverns"),
+    CampaignMap("CAMPMF", "DD_Forest1", "Mistymire Forest"),
+    CampaignMap("CAMPAR", "DD_Arabia", "Moraggo Desert Town"),
+    CampaignMap("CAMPAQ", "DD_Atlantis", "Aquanos"),
+    CampaignMap("CAMPSC", "DD_Steampunk", "Sky City"),
+    CampaignMap("CAMPCL", "DD_CrystalLevel", "Crystalline Dimension"),
+    CampaignMap("CDTCDD", "Scary_Dungeon_Gameplay", "Dread Dungeon"),
+    CampaignMap("CDTARC", "ArcaneLibrary_Gameplay", "Arcane Library"),
+    CampaignMap("CAMPPA", "DD_Palantir", "Palantir"),
+    CampaignMap("CAMPJ2", "DD_Akatiti", "Akatiti Jungle"),
+    CampaignMap("CDTCBB", "Pirate_Base_Gameplay", "Buccaneer Bay"),
+    CampaignMap("CDTEMV", "DD_Mines_Gameplay", "Embermount Volcano"),
+    CampaignMap("CDTCTP", "PolyTemple", "Temple of Water"),
+    CampaignMap("CAMPMB", "CR4ZY_Moonbase", "Moonbase"),
 )
 MAP_BY_FILENAME = {entry.filename.casefold(): entry for entry in CAMPAIGN_MAPS}
 SUMMIT_REQUIRED_CLEAR_TAGS = frozenset(
-    entry.tag for entry in CAMPAIGN_MAPS if entry.tag not in {"CAMPTS", "CAMPGC"}
+    entry.tag for entry in CAMPAIGN_MAPS[:11]
 )
 START_WAVES = {
     "CAMPDW": 1,
@@ -62,12 +75,21 @@ START_WAVES = {
     "CAMPRP": 4,
     "CAMPES": 4,
     "CAMPTS": 5,
-    "CAMPGC": 1,
+    "CAMPGC": 5,
+    "CAMPMF": 5, "CAMPAR": 5, "CAMPAQ": 5, "CAMPSC": 5,
+    "CAMPCL": 13, "CDTCDD": 5, "CDTARC": 5, "CAMPPA": 7,
+    "CAMPJ2": 7, "CDTCBB": 7, "CDTEMV": 10, "CDTCTP": 12,
+    "CAMPMB": 5,
 }
 FINAL_WAVES = {
-    entry.tag: (10 if entry.tag == "CAMPGC" else START_WAVES[entry.tag] + 4)
-    for entry in CAMPAIGN_MAPS
+    entry.tag: START_WAVES[entry.tag] + 4 for entry in CAMPAIGN_MAPS[:12]
 }
+FINAL_WAVES.update({
+    "CAMPGC": 10, "CAMPMF": 12, "CAMPAR": 12, "CAMPAQ": 12,
+    "CAMPSC": 12, "CAMPCL": 18, "CDTCDD": 10, "CDTARC": 12,
+    "CAMPPA": 14, "CAMPJ2": 14, "CDTCBB": 14, "CDTEMV": 15,
+    "CDTCTP": 18, "CAMPMB": 13,
+})
 
 DIFFICULTIES = (
     "EGD_EASY",
@@ -84,11 +106,10 @@ class ProtocolError(ValueError):
     pass
 
 
-def summit_is_unlocked(observed_location_keys: object, required_maps: int = 11,
-                       minimum_difficulty: int = 1) -> bool:
-    """Return whether every non-Summit base map has a recorded victory."""
+def summit_clear_count(observed_location_keys: object, minimum_difficulty: int = 1) -> int:
+    """Count distinct qualifying base-campaign victories, not waves or repeats."""
     if not isinstance(observed_location_keys, (dict, list, tuple, set, frozenset)):
-        return False
+        return 0
     cleared_tags = {
         key.split(".")[2]
         for key in observed_location_keys
@@ -98,15 +119,20 @@ def summit_is_unlocked(observed_location_keys: object, required_maps: int = 11,
         and len(key.split(".")) >= 5
         and key.split(".")[4] in {d.removeprefix("EGD_").lower() for d in DIFFICULTIES[minimum_difficulty:]}
     }
-    return len(SUMMIT_REQUIRED_CLEAR_TAGS & cleared_tags) >= required_maps
+    return len(SUMMIT_REQUIRED_CLEAR_TAGS & cleared_tags)
+
+
+def summit_is_unlocked(observed_location_keys: object, required_maps: int = 11,
+                       minimum_difficulty: int = 1) -> bool:
+    return summit_clear_count(observed_location_keys, minimum_difficulty) >= required_maps
 
 
 def summit_settings(slot_data: dict) -> dict[str, int]:
     result = {}
     for name, default, low, high in (
         ("summit_required_maps", 11, 1, 11),
-        ("summit_unlock_difficulty", 1, 0, 3),
-        ("summit_goal_difficulty", 2, 0, 3),
+        ("summit_unlock_difficulty", 1, 0, 5),
+        ("summit_goal_difficulty", 2, 0, 5),
     ):
         value = slot_data.get(name, default)
         if type(value) is not int or not low <= value <= high:
@@ -130,7 +156,7 @@ def recover_observed_victories(
 
     checked = set(checked_location_ids)
     recovered = 0
-    for map_index, campaign_map in enumerate(CAMPAIGN_MAPS):
+    for map_index, campaign_map in enumerate(CAMPAIGN_MAPS[:12]):
         if campaign_map.tag == "CAMPGC":
             continue
         for difficulty in ("EGD_EASY", "EGD_MEDIUM", "EGD_HARD"):
@@ -380,8 +406,11 @@ def load_bridge_state(path: Path) -> dict[str, Any]:
         "received_items",
         "goal_complete",
     }
-    if set(value) - {"summit_settings", "victory_history", "content_settings", "challenge_victories"} != required:
+    if set(value) - {"summit_settings", "victory_history", "content_settings", "challenge_victories", "chaos_mapping_token", "mana_payouts"} != required:
         raise ProtocolError("invalid bridge-state shape")
+    if 'chaos_mapping_token' in value and (not isinstance(value['chaos_mapping_token'], str) or
+            not re.fullmatch(r'[0-9a-f]{32}', value['chaos_mapping_token'])):
+        raise ProtocolError('invalid saved randomized loadout identity')
     summit_settings(value.get("summit_settings", {}))
     if not isinstance(value.get("victory_history", {}), dict):
         raise ProtocolError("invalid victory history")
@@ -413,6 +442,12 @@ def load_bridge_state(path: Path) -> dict[str, Any]:
     expected_last = indices[-1] if indices else -1
     if value["last_received_index"] != expected_last:
         raise ProtocolError("last_received_index does not match received_items")
+    if 'mana_payouts' in value:
+        try:
+            from .dd1_mana import validate_mana_ledger
+        except ImportError:
+            from dd1_mana import validate_mana_ledger
+        validate_mana_ledger(value)
     if not isinstance(value["processed_files"], list):
         raise ProtocolError("processed_files must be a list")
     if not isinstance(value["observed_locations"], dict):
@@ -583,12 +618,46 @@ def write_unlock_ini(
     *,
     level_six_heroes: Iterable[str] = (),
     experience_multiplier: int = 1,
+    level_catch_up_multiplier: int = 1,
     active_heroes: Iterable[str] = BASE_HERO_KEYS,
     seed_identity: str = "",
     difficulty_mask: int = 15,
     mode_mask: int = 3,
+    starting_crystal_roll: int = 0,
+    build_time_seconds: int = 0,
+    defense_units_bonus: int = 0,
+    survival_start_wave: int = -1,
+    crystal_skin_mask: int = 0,
+    shopsanity: bool = False,
+    received_xp_rewards: int = 0,
+    received_mana_rewards: int = 0,
+    received_gear_rewards: int = 0,
+    active_maps: Iterable[str] = tuple(m.tag for m in CAMPAIGN_MAPS[:12]),
+    hero_skin_mode: int = 0,
+    hero_skin_keys: Iterable[str] = (),
+    eternia_shard_mask: int = -1,
+    random_gear_pets: bool = False,
+    chaos_slot_data: dict | None = None,
+    chaos_player: int = 0,
+    reverse_bridge: bool = False,
+    tavern_themes: bool = False,
+    tavern_theme_mask: int = 0,
 ) -> None:
     state = validate_unlock_state(value)
+    if type(tavern_themes) is not bool or type(tavern_theme_mask) is not int or not 0 <= tavern_theme_mask <= 2047:
+        raise ProtocolError('Invalid tavern theme settings.')
+    if type(random_gear_pets) is not bool:
+        raise ProtocolError('Invalid random gear pets setting.')
+    if type(eternia_shard_mask) is not int or not -1 <= eternia_shard_mask <= 15:
+        raise ProtocolError('Invalid Eternia shard display mask.')
+    map_tags = tuple(sorted(set(active_maps)))
+    skin_keys = tuple(sorted(set(hero_skin_keys)))
+    if not set(map_tags) <= {m.tag for m in CAMPAIGN_MAPS}:
+        raise ProtocolError('Unknown active map.')
+    if type(hero_skin_mode) is not int or hero_skin_mode not in (0, 1, 2):
+        raise ProtocolError('Invalid hero skin mode.')
+    if any(not SAFE_IDENTIFIER.fullmatch(key) for key in skin_keys):
+        raise ProtocolError('Invalid hero skin key.')
     if seed_identity and not re.fullmatch(r"dd1-[0-9a-f]{64}", seed_identity):
         raise ProtocolError("invalid seed identity")
     roster = tuple(dict.fromkeys(active_heroes))
@@ -601,20 +670,55 @@ def write_unlock_ini(
         raise ProtocolError("unlocked heroes must belong to active_heroes")
     if isinstance(experience_multiplier, bool) or experience_multiplier not in {1, 2, 4, 6, 8, 10}:
         raise ProtocolError("experience_multiplier must be one of 1, 2, 4, 6, 8, or 10")
+    if isinstance(level_catch_up_multiplier, bool) or level_catch_up_multiplier not in {1, 2, 4, 6, 8, 10}:
+        raise ProtocolError("level_catch_up_multiplier must be off or one of 2, 4, 6, 8, or 10")
     unlocked = state["unlocked"]
-    if type(difficulty_mask) is not int or not 1 <= difficulty_mask <= 15 or not difficulty_mask & 1:
+    if type(difficulty_mask) is not int or not 1 <= difficulty_mask <= 63 or not difficulty_mask & 1:
         raise ProtocolError("difficulty permissions must include Easy")
-    if type(mode_mask) is not int or not 0 <= mode_mask <= 3:
+    if type(mode_mask) is not int or not 0 <= mode_mask <= 127:
         raise ProtocolError("invalid mode permissions")
+    if type(starting_crystal_roll) is not int or not 0 <= starting_crystal_roll < 1_000_000_000:
+        raise ProtocolError('invalid starting crystal roll')
+    if type(build_time_seconds) is not int or not 0 <= build_time_seconds <= 200:
+        raise ProtocolError('invalid build time bonus')
+    if type(defense_units_bonus) is not int or defense_units_bonus not in range(0, 31, 5):
+        raise ProtocolError('invalid defense units bonus')
+    if type(survival_start_wave) is not int or survival_start_wave not in (-1, 1, 5, 10, 15, 20, 25):
+        raise ProtocolError('invalid survival starting wave')
+    if type(crystal_skin_mask) is not int or not 0 <= crystal_skin_mask < (1 << 26):
+        raise ProtocolError('invalid crystal skin mask')
+    for label, count, maximum in (
+        ('received XP rewards', received_xp_rewards, 1_000_000),
+        ('received mana rewards', received_mana_rewards, 1_000_000_000),
+        ('received gear rewards', received_gear_rewards, 1_000_000),
+    ):
+        if type(count) is not int or not 0 <= count <= maximum:
+            raise ProtocolError(f'invalid {label}')
     lines = [
         "[DD1Archipelago.APUnlockState]",
+        f"bReverseBridge={'True' if reverse_bridge else 'False'}",
+        f"bTavernThemes={'True' if tavern_themes else 'False'}",
+        f"TavernThemeMask={tavern_theme_mask if tavern_themes else 0}",
         f"Revision={state['revision']}",
         f"Slot={state['slot']}",
         f"SeedIdentity={seed_identity}",
         f"MaxEquipmentQuality={unlocked['max_equipment_quality']}",
         f"ExperienceMultiplier={experience_multiplier}",
+        f"LevelCatchUpMultiplier={level_catch_up_multiplier}",
         f"DifficultyMask={difficulty_mask}",
         f"ModeMask={mode_mask}",
+        f"StartingCrystalRoll={starting_crystal_roll}",
+        f"BuildTimeSeconds={build_time_seconds}",
+        f"DefenseUnitsBonus={defense_units_bonus}",
+        f"SurvivalStartWave={survival_start_wave}",
+        f"CrystalSkinMask={crystal_skin_mask}",
+        f"bShopsanity={'True' if shopsanity else 'False'}",
+        f"ReceivedXPRewards={received_xp_rewards}",
+        f"ReceivedManaRewards={received_mana_rewards}",
+        f"ReceivedGearRewards={received_gear_rewards}",
+        f"HeroSkinMode={hero_skin_mode}",
+        f"EterniaShardMask={eternia_shard_mask}",
+        f"bRandomGearPets={'True' if random_gear_pets else 'False'}",
     ]
     field_names = (
         ("UnlockedHeroes", "heroes"),
@@ -627,6 +731,17 @@ def write_unlock_ini(
 
     lines.extend(f"ActiveHeroes={hero}" for hero in roster)
     lines.extend(f"LevelSixHeroes={hero}" for hero in early_heroes)
+    lines.extend(f"ActiveMaps={tag}" for tag in map_tags)
+    lines.extend(f"UnlockedHeroSkins={key}" for key in skin_keys)
+
+    if chaos_slot_data is not None:
+        # Same atomic file as the permissions: never publish a new mapping and
+        # old seed's unlock state in separate writes. Private APWorld only.
+        from .chaos_loadouts import config_lines
+        try:
+            lines.extend(config_lines(chaos_slot_data, chaos_player, seed_identity))
+        except (ValueError, KeyError, TypeError) as error:
+            raise ProtocolError(f'Invalid randomized loadout: {error}') from error
 
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")

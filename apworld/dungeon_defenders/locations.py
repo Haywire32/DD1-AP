@@ -6,7 +6,7 @@ from .dd1_protocol import (
 
 
 DIFFICULTIES = ("Easy", "Medium", "Hard")
-CAMPAIGN_MAPS_V1 = tuple(entry for entry in CAMPAIGN_MAPS if entry.tag != "CAMPGC")
+CAMPAIGN_MAPS_V1 = CAMPAIGN_MAPS[:12]
 def location_id(map_index: int, difficulty: str, *, wave: int | None = None) -> int:
     difficulty_index = DIFFICULTY_INDEX[f"EGD_{difficulty.upper()}"]
     base = PROTOTYPE_LOCATION_ID_BASE + map_index * 10_000 + difficulty_index * 1_000

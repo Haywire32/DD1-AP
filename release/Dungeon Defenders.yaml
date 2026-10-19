@@ -1,65 +1,363 @@
-# Dungeon Defenders Archipelago 0.5.1
+# Q. What is this file?
+# A. This file contains options which allow you to configure your multiworld experience while allowing
+#    others to play how they want as well.
+#
+# Q. How do I use it?
+# A. The options in this file are weighted. This means the higher number you assign to a value, the
+#    more chances you have for that option to be chosen. For example, an option like this:
+#
+#    map_shuffle:
+#      on: 5
+#      off: 15
+#
+#    Means you have 5 chances for map shuffle to occur, and 15 chances for map shuffle to be turned
+#    off.
+#
+# Q. I've never seen a file like this before. What characters am I allowed to use?
+# A. This is a .yaml file. You are allowed to use most characters.
+#    To test if your yaml is valid or not, you can use this website:
+#        http://www.yamllint.com/
+#    You can also verify that your Archipelago options are valid at this site:
+#        https://archipelago.gg/check
 
-name: PlayerName
-description: Dungeon Defenders Archipelago 0.5.1
+# Your name in-game, limited to 16 characters.
+#     {player} will be replaced with the player's slot number.
+#     {PLAYER} will be replaced with the player's slot number, if that slot number is greater than 1.
+#     {number} will be replaced with the counter value of the name.
+#     {NUMBER} will be replaced with the counter value of the name, if the counter value is greater than 1.
+name: Player{number}
+
+# Used to describe your yaml. Useful if you have multiple files.
+description: Default Dungeon Defenders Template
 
 game: Dungeon Defenders
 requires:
   version: 0.6.7
+  game:
+    Dungeon Defenders: 0.8.1 # Version of the world required for this yaml to work as expected.
 
 Dungeon Defenders:
-  # Choose 2 to 16 heroes. You must own any DLC heroes you select.
-  # Names: apprentice, squire, huntress, monk, adept, countess, ranger, initiate,
-  # barbarian, series_ev, summoner, jester, hermit, gunwitch, warden, guardian.
-  # Include at least one builder. Counterparts can be chosen together.
-  active_heroes: [apprentice, squire, huntress, monk]
-
-  # Multiplies all normal gameplay experience after DD1 applies its own bonuses. Choose 1, 2, 4, 6, 8, or 10.
-  experience_multiplier: 1
-
-  # local: map unlocks stay in your DD1 campaign. global: maps can also be in other archipelago worlds.
-  map_unlock_placement: local
-
-  # Select which difficulties give checks per wave. Any combination of easy, medium, hard, insane. Higher difficulty levels automatically clear the lower ones.
-  campaign_check_difficulties: [easy, medium, hard]
-
-  #  Add survival levels as checks: true/false. 
-  survival_checks: true
-
-  # Select survival difficulty that gives the checks. Choose only one: easy, medium, hard, insane. Higher difficulty levels will count as lower ones.
-  survival_check_difficulty: medium
-  # Choose 5, 10, 15, 20, or 25. Every wave from 1 gives a check.
-  survival_max_wave: 10
-
-  #  Add challenge levels as checks: true/false. 
-  challenge_checks: false
-  challenge_check_difficulty: medium
-
-  # True/false: enable modes as separate item unlocks. Difficulty_unlocks requires at least easy enabled in campaign_check_difficulties
-  # Difficulty unlocks are progressive: Medium, then Hard, then Insane.
-  difficulty_unlocks: false
-  survival_unlock: false
-  challenge_unlock: false
-
-  # Choose the completion goal, either summit or challenges. summit: beat The Summit on required difficulty. challenges: beat X amount of challenges as a goal. 
-  # challenges as goal requires challenge_checks: true. challenges as goal will add The Summit to the regular map pool like any other map.
-  completion_goal: summit
-
-  # If summit as goal is selected: Beat a set amount of campaign maps to unlock "The Summit". Beat this level on a set difficulty to win.
-  # Choose the amount of levels you need to beat to unlock the final map "The Summit". Valid numbers are 1 to 11.
-  summit_required_maps: 11
-  # Choose the map difficulty that is required to progress towards "The Summit" unlock. Beating higher difficulties counts for any lower ones. For example, you have to beat all 11 maps on at least medium to unlock "The Summit". Choose one: easy, medium, hard, or insane
-  summit_unlock_difficulty: medium
-  # Choose the difficulty required for "The Summit" to beat the Archipelago goal. Choose one: easy, medium, hard, or insane
-  summit_goal_difficulty: hard
-
-  # If challenges as goal is selected: choose amount required as a goal, and choose the difficulty required to beat each level to get the goal.
-  challenges_required: 1
-  challenge_goal_difficulty: medium
-
+  ################
+  # Game Options #
+  ################
   progression_balancing:
-    normal: 50
-    
+    # A system that can move progression earlier, to try and prevent the player from getting stuck and bored early.
+    # 
+    # A lower setting means more getting stuck. A higher setting means less getting stuck.
+    #
+    # You can define additional values between the minimum and maximum values.
+    # Minimum value is 0
+    # Maximum value is 99
+    random: 0
+    random-low: 0 # random value weighted towards lower values
+    random-high: 0 # random value weighted towards higher values
+    random-range-0-99: 0 # random value between 0 and 99
+    disabled: 0 # equivalent to 0
+    normal: 50 # equivalent to 50
+    extreme: 0 # equivalent to 99
+
+  map_unlock_placement:
+    # Global allows map unlocks in any player's world. Local keeps them in your own DD1 campaign.
+    local: 0
+    global: 50
+
+  completion_goal:
+    # Choose one of three completion goals. Beat The Summit (original campaign), a set amount of challenges, 
+    # or get the four eternia shards and beat the crystalline dimension (requires DLC).
+    # CD-goal Bank Mana scales with different campaign maps completed when received:
+    # 0-7: 25k/50k/75k; 8-11: 250k/500k/1m; 12-15: 5m/10m/20m; 16+: 50m/100m/500m.
+    # Each band gives an even mix of its three amounts. No specific maps are required.
+    Summit: 50
+    Challenges: 0
+    crystalline_dimension: 0
+
+  ################################
+  # Summit campaign goal options #
+  ################################
+
+  summit_required_maps:
+    # Campaign victories required to unlock The Summit.
+    # Minimum value is 1
+    # Maximum value is 11
+    11: 50
+    random: 0
+    random-low: 0 # random value weighted towards lower values
+    random-high: 0 # random value weighted towards higher values
+    random-range-1-11: 0 # random value between 1 and 11
+
+  summit_unlock_difficulty:
+    # The difficulty to complete maps at to count towards unlocking the Summit.
+    easy: 0
+    medium: 50
+    hard: 0
+    insane: 0
+    nightmare: 0
+    ruthless: 0
+
+  summit_goal_difficulty:
+    # The difficulty at which to complete The Summit to goal
+    easy: 0
+    medium: 0
+    hard: 50
+    insane: 0
+    nightmare: 0
+    ruthless: 0
+
+  ###########################
+  # Challenges goal options #
+  ###########################
+
+  challenges_required:
+    # Number of different challenge victories required for the challenges goal.
+    # You can define additional values between the minimum and maximum values.
+    # Minimum value is 1
+    # Maximum value is 12
+    1: 50
+    random: 0
+    random-low: 0 # random value weighted towards lower values
+    random-high: 0 # random value weighted towards higher values
+    random-range-1-12: 0 # random value between 1 and 12
+
+  challenge_goal_difficulty:
+    easy: 0
+    medium: 50
+    hard: 0
+    insane: 0
+    nightmare: 0
+    ruthless: 0
+
+  ######################################
+  # Crystalline dimension goal options #
+  ######################################
+
+  crystalline_dimension_unlock:
+    # Choose whether the four shards to unlock crystalline dimension comes from completing the four DLC maps (shard_maps), or from four random items (eternia_shards).
+    shard_maps: 50
+    eternia_shards: 0
+
+  crystalline_dimension_difficulty:
+    # Choose the difficulty you need to beat crystalline dimension on to get the goal.
+    easy: 0
+    medium: 50
+    hard: 0
+    insane: 0
+    nightmare: 0
+    ruthless: 0
+
+  extra_campaign_maps:
+    # Choose whether you want to add 8 free DLC maps to the pool. This only works for the crystalline dimension goal. 
+    # The maps are Dread Dungeon, Arcane Library, Palantir, Akatiti Jungle Buccaneer Bay, Embermount Volcano, Temple of Water, Moonbase
+    'false': 50
+    'true': 0
+
+  ###################
+  # General options #
+  ###################
+
+  active_heroes:
+    # Choose 2-16 heroes. DLC ownership is required for any heroes other than the base four.
+    # apprentice, squire, huntress, monk, adept, countess, ranger, initiate,
+    # barbarian, series_ev, summoner, jester, hermit, gunwitch, warden, guardian.
+    # Include at least one builder. Counterparts may be selected together.
+    ['apprentice', 'squire', 'huntress', 'monk']
+
+  skill_shuffle:
+  # Skill shuffle randomizes the ability and defense pool of all enabled heroes. For example a squire can end up with an apprentice tower.
+    'false': 50
+    'true': 0
+
+  skill_shuffle_mode:
+  # Separate: hero abilities and defenses are shuffled separately from each other. Mixed: any ability/defense can be put in either ability/defense slot
+    separate: 0
+    mixed: 50
+
+  experience_multiplier:
+    # Multiply normal experience after the game's bonuses: 1, 2, 4, 6, 8, or 10.
+    vanilla: 50
+    double: 0
+    quadruple: 0
+    sextuple: 0
+    octuple: 0
+    decuple: 0
+
+  level_catch_up_multiplier:
+    # Heroes below your highest unlocked hero gain experience faster until they catch up. Choose off, 2, 4, 6, 8, or 10.
+    'off': 50
+    double: 0
+    quadruple: 0
+    sextuple: 0
+    octuple: 0
+    decuple: 0
+
+  campaign_check_difficulties:
+    # Choose which difficulties give checks. Any combination of easy, medium, hard, insane, nightmare, ruthless. Higher clears count for selected lower difficulties.
+    ['easy', 'medium', 'hard']
+
+  difficulty_unlocks:
+    # Progressive difficulty.
+    # Unlock difficulties progressively above starting_difficulty. Include campaign checks at or below your starting difficulty.
+    'false': 50
+    'true': 0
+
+  starting_difficulty:
+    # Starting difficulty with progressive difficulty enabled. Lower difficulties are also unlocked.
+    easy: 0
+    medium: 50
+    hard: 0
+    insane: 0
+    nightmare: 0
+    ruthless: 0
+
+  check_density:
+    # Choose every wave, milestone gives a check at the start/middle/end, or victories only.
+    every_wave: 50
+    milestones: 0
+    victories_only: 0
+
+  shopsanity:
+    # Add 27 purchases alongside the normal tavern shop. Use the Archipelago Shop button to switch. 
+    # Categories open after completing 3, 5, and 7 different campaign maps on any difficulty.
+    # Crystalline Dimension goal adds 9 more purchases after 12 different campaign maps.
+    'false': 0
+    'true': 50
+
+  hero_skin_items:
+    # Add hero skins as items for all enabled heroes. Some skins require DLC, and you wont be able to use them if you dont own them.
+    'false': 50
+    'true': 0
+
+  hero_skins_unlocked:
+    # Start the game with all hero skins unlocked. You can only use the ones you own the DLC for.
+    'false': 50
+    'true': 0
+
+  tavern_themes:
+    # Open the upstairs theme selector and add 9 cosmetic theme unlocks as items.
+    # Jester and Halloween are excluded. All four Shards DLC parts are required to play this seed.
+    # Requires all four Lost Eternia Shards DLC parts. The original tavern stays available.
+    'false': 50
+    'true': 0
+
+  death_link:
+    # Share deaths with other DeathLink players. Disabled in the tavern and menus.
+    'false': 50
+    'true': 0
+
+  death_link_mode:
+    # Choose hero death or crystal destruction.
+    hero_death: 50
+    crystal_destruction: 0
+
+  trap_percentage:
+    # Percentage of ordinary filler replaced by traps (0-100). Zero disables traps.
+    0: 50
+
+  enabled_traps:
+    # Remove entries to exclude those traps. Used only when trap_percentage is above zero.
+    ['chicken', 'gold_rush', 'rush_hour', 'skill_jam', 'ready_or_not', 'ogre_surprise', 'sudden_death']
+
+  random_gear_pets:
+    # Allow random gear rewards to include pets, using tavern-shop scaling.
+    'false': 50
+    'true': 0
+
+  progressive_defense_units:
+    # Add six unlocks that each give 5 extra defense units, up to 30. No Towers Allowed always stays at 0.
+    'false': 50
+    'true': 0
+
+  #####################
+  # Challenge options #
+  #####################
+
+  challenge_checks:
+    # Add checks for the 12 campaign-map challenges. This is required for the Challenges goal.
+    'false': 50
+    'true': 0
+
+  challenge_unlock:
+    # Challenges have three area items, four maps each, independent of campaign map unlocks.
+    'false': 50
+    'true': 0
+
+  challenge_check_difficulty:
+    # At which difficulty you unlock checks.
+    easy: 0
+    medium: 50
+    hard: 0
+    insane: 0
+    nightmare: 0
+    ruthless: 0
+
+  ####################
+  # Survival options #
+  ####################
+
+  survival_checks:
+    # Add survival wave checks on the 12 campaign maps.
+    'false': 50
+    'true': 0
+
+  survival_unlock:
+    # With survival_checks enabled, add three Survival area items, four maps each. Ignored when survival_checks is false. The campaign map must also be unlocked.
+    'false': 50
+    'true': 0
+
+  survival_check_difficulty:
+    # At which difficulty you unlock checks.
+    easy: 0
+    medium: 50
+    hard: 0
+    insane: 0
+    nightmare: 0
+    ruthless: 0
+
+  survival_max_wave:
+    # Give one check per survival wave from 1 through this wave.
+    five: 0
+    ten: 0
+    fifteen: 50
+    twenty: 0
+    twenty_five: 0
+
+  ###################################
+  # Standard item & location options #
+  ###################################
+
   accessibility:
     full: 50
     minimal: 0
+
+  local_items: []
+    # Items that must be placed in your own world.
+
+  non_local_items: []
+    # Items that must be placed in another player's world.
+
+  start_inventory: {}
+    # Start with extra items. Use exact item names and quantities, not weights.
+    # Example: replace the line above with:
+    # start_inventory:
+    #   Monk: 1
+    # Only use heroes enabled in active_heroes; defenses and abilities are separate items.
+
+  start_hints: []
+    # Item names to receive hints for at the start.
+
+  start_location_hints: []
+    # Location names to receive hints for at the start.
+
+  exclude_locations: []
+    # Prevent important items being placed here. This does not remove the checks.
+
+  priority_locations: []
+    # Locations to prioritize for important items.
+
+  item_links: []
+    # Optional item-sharing groups for a multiworld.
+
+  plando_items: []
+    # Optional explicit item placements; requires the generator to allow item plando.
+
+
+

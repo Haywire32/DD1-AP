@@ -2,7 +2,11 @@
 
 from BaseClasses import ItemClassification
 from .heroes import HEROES, HERO_BY_KEY, normalize_hero_keys
-from .dd1_content import XP_REWARDS, MANA_REWARDS, MODE_ITEMS, DIFFICULTY_ITEMS, SUMMIT_MAP_ITEM, PROGRESSIVE_DIFFICULTY
+from .dd1_content import XP_REWARDS, MANA_REWARDS, AREA_ITEMS, BUILD_TIME_ITEM, SUMMIT_MAP_ITEM, PROGRESSIVE_DIFFICULTY
+from .dd1_content import DEFENSE_UNITS_ITEM, SURVIVAL_START_ITEM, SCALED_MANA_ITEM
+from .dd1_campaign import EXTRA_MAP_ITEMS, ETERNIA_SHARD_ITEMS
+from .dd1_hero_skins import HERO_SKIN_ITEMS
+from .dd1_traps import TRAP_NAMES
 
 
 ITEM_ID_BASE = 9_200_000_000
@@ -41,19 +45,22 @@ MAP_TIERS = (
         "Servants Quarters Map",
         "Castle Armory Map",
         "Hall of Court Map",
+        "The Throne Room Map",
     ),
     (
-        "The Throne Room Map",
         "Royal Gardens Map",
         "The Ramparts Map",
         "Endless Spires Map",
+        SUMMIT_MAP_ITEM,
     ),
 )
 
 PROGRESSION_ITEMS = tuple(HERO_ITEMS) + tuple(DEFENSE_ITEMS) + tuple(ABILITY_ITEMS) + tuple(MAP_ITEMS)
-XP_FILLER_ITEM = "Two Hero Levels"
+XP_FILLER_ITEM = "One Hero Level"
 MANA_FILLER_ITEM = "25,000 Bank Mana"
-FILLER_ITEMS = tuple(XP_REWARDS) + tuple(MANA_REWARDS)
+from .dd1_cosmetic_rewards import CRYSTAL_ITEMS, GEAR_ITEM
+
+FILLER_ITEMS = tuple(XP_REWARDS) + tuple(MANA_REWARDS) + (GEAR_ITEM,) + CRYSTAL_ITEMS + (SCALED_MANA_ITEM,)
 # Keep the retired prototype filler in the table so its numeric ID can never
 # be reinterpreted as a real reward when an old test seed reconnects.
 LEGACY_NOTHING_ITEM = "Nothing"
@@ -187,17 +194,32 @@ V040_ITEM_NAMES = (
     "Shield Bash (Guardian)",
     "Divine Judgement (Guardian)",
 )
-V050_ITEM_NAMES = (tuple(DIFFICULTY_ITEMS.values()) + tuple(MODE_ITEMS.values())
-                  + tuple(n for n in FILLER_ITEMS if n not in LEGACY_ITEM_NAMES)
-                  + (SUMMIT_MAP_ITEM, PROGRESSIVE_DIFFICULTY))
-ALL_ITEM_NAMES = LEGACY_ITEM_NAMES + V040_ITEM_NAMES + V050_ITEM_NAMES
+V050_ITEM_NAMES = ('Medium Difficulty', 'Hard Difficulty', 'Insane Difficulty',
+                  'Survival Mode', 'Challenge Mode', 'One Hero Level',
+                  'Three Hero Levels', 'Four Hero Levels', '100,000 Bank Mana',
+                  '500,000 Bank Mana', '1,000,000 Bank Mana', '2,000,000 Bank Mana',
+                  SUMMIT_MAP_ITEM, PROGRESSIVE_DIFFICULTY)
+NEW_ITEM_NAMES = ('50,000 Bank Mana', '75,000 Bank Mana',
+                 *AREA_ITEMS['survival'], *AREA_ITEMS['challenge'], BUILD_TIME_ITEM)
+ALL_ITEM_NAMES = LEGACY_ITEM_NAMES + V040_ITEM_NAMES + V050_ITEM_NAMES + NEW_ITEM_NAMES + (GEAR_ITEM,) + CRYSTAL_ITEMS + (DEFENSE_UNITS_ITEM, SURVIVAL_START_ITEM) + tuple(EXTRA_MAP_ITEMS) + tuple(HERO_SKIN_ITEMS) + (SCALED_MANA_ITEM,)
+MAP_ITEMS.update(EXTRA_MAP_ITEMS)
+from .dd1_themes import THEME_NAMES
+ALL_ITEM_NAMES += TRAP_NAMES + THEME_NAMES
 if len(set(ALL_ITEM_NAMES)) != len(ALL_ITEM_NAMES) or set(PROGRESSION_ITEMS) - set(ALL_ITEM_NAMES):
     raise ValueError("Every catalog item needs exactly one permanent, append-only item ID.")
-ITEM_NAME_TO_ID = {name: ITEM_ID_BASE + index for index, name in enumerate(ALL_ITEM_NAMES)}
+# Preserve the retired development-map ID as an unused gap, including skins.
+_RETIRED_INDEX = ALL_ITEM_NAMES.index('Moonbase Map')
+ITEM_NAME_TO_ID = {name: ITEM_ID_BASE + index + int(index >= _RETIRED_INDEX)
+                   for index, name in enumerate(ALL_ITEM_NAMES)}
+ITEM_NAME_TO_ID.update(ETERNIA_SHARD_ITEMS)
+ALL_ITEM_NAMES += tuple(ETERNIA_SHARD_ITEMS)
+assert len(set(ITEM_NAME_TO_ID.values())) == len(ITEM_NAME_TO_ID)
 ITEM_CLASSIFICATIONS = {
     name: (
+        ItemClassification.trap if name in TRAP_NAMES else
         ItemClassification.filler
         if name in FILLER_ITEMS or name == LEGACY_NOTHING_ITEM
+        else ItemClassification.useful if name in THEME_NAMES or name in HERO_SKIN_ITEMS or name in (BUILD_TIME_ITEM, DEFENSE_UNITS_ITEM, SURVIVAL_START_ITEM)
         else ItemClassification.progression
     )
     for name in ALL_ITEM_NAMES
@@ -225,10 +247,12 @@ GENERIC_DAMAGE_DEFENSES = frozenset(hero.item_name(tool) for hero in HEROES
                                     for tool in hero.defenses if tool.generic_damage)
 
 
-def progression_items_for_heroes(values, *, include_summit=False) -> tuple[str, ...]:
+def progression_items_for_heroes(values, *, include_summit=False, map_tags=None) -> tuple[str, ...]:
     """The selected kits only; catalog IDs remain available for old received items."""
     selected = tuple(HERO_BY_KEY[key] for key in normalize_hero_keys(values))
     return (tuple(hero.name for hero in selected)
             + tuple(hero.item_name(tool) for hero in selected for tool in hero.defenses)
             + tuple(hero.item_name(tool) for hero in selected for tool in hero.abilities)
-            + tuple(n for n in MAP_ITEMS if include_summit or n != SUMMIT_MAP_ITEM))
+            + tuple(n for n, tag in MAP_ITEMS.items()
+                    if (tag in map_tags if map_tags is not None else n not in EXTRA_MAP_ITEMS)
+                    and (include_summit or n != SUMMIT_MAP_ITEM)))

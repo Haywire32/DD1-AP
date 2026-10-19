@@ -1,48 +1,29 @@
-Dungeon Defenders Archipelago - version 0.5.1 playtest
-================================================
+Dungeon Defenders Archipelago 0.8.1
 
-This mod is for Play Local only.
+Requires Steam Dungeon Defenders and Archipelago 0.6.8.
+Own the DLC for enabled heroes and difficulties.
+Tavern themes require all four Lost Eternia Shards DLCs.
+Local play only.
 
-Requirements
-------------
-- Dungeon Defenders from Steam
-- Archipelago 0.6.7 or newer
-- The DLC for any extra heroes you select in your YAML
+INSTALL
+1. Install dungeon_defenders.apworld.
+2. Extract TotalConversions-v0.8.1.zip into your Dungeon Defenders folder.
+   Merge TotalConversions/DD1ArchipelagoCurrent and replace packaged files.
+   Keep existing saves and generated settings.
+3. Put Dungeon Defenders.yaml in Archipelago/Players, edit it, and generate.
+4. Open Dungeon Defenders Client in Archipelago and connect.
+5. Choose Play Local in DD1.
 
-Game install and setup
------------------------------------
-1. Install/update Dungeon Defenders in Steam. Keep Steam running and signed in.
-2. In Steam, right-click Dungeon Defenders, then Manage > Browse local files.
+Update both the APWorld and TotalConversion when upgrading from 0.8.0.
+New reward options require a new seed.
 
-Use English as the game's language for this playtest (Steam > Properties >
-General > Language).
+SOURCE
+The source ZIP uses the existing GitHub folder layout.
+Replace the corresponding source folders with the new ones.
+It is not a playable installation.
 
-This version runs in regular DD1. DDDK is no longer needed.
-
-Mod installation
----------------
-1. Double-click dungeon_defenders.apworld to install it.
-   Alternatively put the file into your \Archipelago\custom_worlds folder.
-2. Copy the DD1ArchipelagoCurrent folder
-   to: \Steam\steamapps\common\Dungeon Defenders\TotalConversions
-   Create TotalConversions if it does not exist.
-   The final path is ...\TotalConversions\DD1ArchipelagoCurrent.
-3. Copy Dungeon Defenders.yaml to the Players folder in your Archipelago installation. Edit its slot name
-   and documented options, then generate normally.
-
-Play
-----
-Open Archipelago Launcher, select Dungeon Defenders Client, and enter the
-server and slot. The game should launch automatically. 
-Choose Play Local; online play is intentionally disabled.
-
-The client finds Dungeon Defenders through Steam's library locations, including
-other drives. You do not need to open the editor, use Cook TC, or compile files.
-No Discord downloads or extra installer scripts are needed.
-
-
-Playing normal DD1
-------------------
-Close the AP game and client, then launch Dungeon Defenders normally from Steam.
-Do not select the Archipelago Total Conversion for online play. The mod does
-not replace your normal game's executable or normal character save.
+STARTUP PROBLEMS
+Follow any missing-file or configuration warning in the client.
+Do not delete the conversion folder: it contains saves.
+Logs are in TotalConversions/DD1ArchipelagoCurrent/Config:
+DD1ArchipelagoLive.log and, when created, DD1ArchipelagoGame-*.log.

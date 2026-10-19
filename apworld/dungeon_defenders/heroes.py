@@ -164,7 +164,9 @@ MAX_ACTIVE_HEROES = 16
 ITEM_CHECK_COUNT = 83
 SUMMIT_FILLER_COUNT = 6
 PLACED_MAP_COUNT = 10
-STARTING_SUMMONER_MINIONS = frozenset({"archer_minion", "spider_minion", "orc_minion"})
+# Spider damage is poison-only and cannot safely carry an opening against
+# poison-immune enemies. It remains a normal unlock, but is never the starter.
+STARTING_SUMMONER_MINIONS = frozenset({"archer_minion", "orc_minion"})
 
 
 def normalize_hero_keys(values: str | Iterable[str]) -> tuple[str, ...]:
@@ -238,6 +240,12 @@ def _opening_packages(keys: tuple[str, ...], starter: Hero, first_action: Action
         for left, right in combinations(candidates, 2):
             if second.builder and second.key not in {left[1], right[1]}:
                 continue
+            # If the first reward was an ability, the wave-3 reward must be an
+            # affordable damage defense. Both recipients are unlocked by then.
+            if not is_starting_defense(left[2]) and is_starting_defense(right[2]):
+                left, right = right, left
+            if not is_starting_defense(left[2]) and not (starter.builder and is_starting_defense(first_action)):
+                continue
             defense_actions = [left[2], right[2]]
             if starter.builder:
                 defense_actions.append(first_action)
@@ -261,7 +269,7 @@ def choose_opening(values: str | Iterable[str], rng, *,
         if not starter.builder:
             first_actions = starter.abilities
         elif key == "summoner":
-            # Approved level-six choices: Archer 40, Spider 80, Orc 140 mana.
+            # Safe level-six choices: Archer 40 or Orc 140 mana.
             first_actions = tuple(tool for tool in starter.defenses
                                   if tool.key in STARTING_SUMMONER_MINIONS
                                   and is_starting_defense(tool))

@@ -28,7 +28,6 @@ static function int GetDLCAppID(string HeroKey)
 static function bool IsHeroLicensed(string HeroKey)
 {
     local int AppID;
-    local OnlineSubsystem OnlineSub;
     if(HeroKey == "apprentice" || HeroKey == "squire" ||
         HeroKey == "huntress" || HeroKey == "monk")
         return true;
@@ -36,6 +35,14 @@ static function bool IsHeroLicensed(string HeroKey)
     AppID = GetDLCAppID(HeroKey);
     if(AppID == 0 || !NativePurchaseCheckVerified)
         return false;
+
+    return IsDLCAppLicensed(AppID);
+}
+
+static function bool IsDLCAppLicensed(int AppID)
+{
+    local OnlineSubsystem OnlineSub;
+    if(AppID <= 0 || !NativePurchaseCheckVerified) return false;
 
     OnlineSub = class'GameEngine'.static.GetOnlineSubsystem();
     if(OnlineSub == none || !OnlineSub.IsA('OnlineSubsystemSteamworks'))

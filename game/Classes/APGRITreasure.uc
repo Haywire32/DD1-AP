@@ -1,7 +1,30 @@
 class APGRITreasure extends DunDefGRI_GoldenTokens;
 
 var int LastAPCompletedWave;
+var int APActiveCombatWave;
 var array<string> ReportedUnknownAPActions;
+
+function Server_AddGRIHeroAbilities(DunDefPlayerController PC)
+{
+    local APGameRuntime APGame;
+    super.Server_AddGRIHeroAbilities(PC);
+    if(WorldInfo.NetMode != NM_Standalone) return;
+    APGame=class'APGameRuntime'.static.GetForWorld(WorldInfo);
+    if(APGame != none) APGame.ApplyChaosLoadout(PC);
+}
+
+simulated function AddGRIActionWheelEntries(ActionWheel Wheel, out array<ActionWheelEntry> Entries)
+{
+    local APGameRuntime APGame;
+    local string Reason;
+    super.AddGRIActionWheelEntries(Wheel,Entries);
+    if(WorldInfo.NetMode != NM_Standalone) return;
+    APGame=class'APGameRuntime'.static.GetForWorld(WorldInfo);
+    if(APGame == none || APGame.UnlockState == none || !APGame.UnlockState.bChaosLoadouts) return;
+    if(APGame.ChaosRuntime == none || !APGame.ChaosRuntime.RemapWheel(Wheel,Entries,Reason))
+        `warn("AP:CHAOS_MENU_NOT_READY " $ Reason);
+}
+
 
 simulated function ShowAPLockedMessage(string Message)
 {
@@ -39,8 +62,8 @@ simulated function LoadMission(CampaignLevelEntryObject MissionObject)
             return;
         }
         if(HeroManager.CurrentGameSettings.InfiniteWaveMode &&
-            Left(MissionObject.MyLevelEntry.EntryIdentifierTag, 4) == "CAMP" &&
-            (APGame.UnlockState.ModeMask & 1) == 0)
+            Left(MissionObject.MyLevelEntry.EntryIdentifierTag, 4) != "SPEC" &&
+            !APGame.UnlockState.IsSurvivalUnlocked(MissionObject.MyLevelEntry.EntryIdentifierTag))
         {
             ShowAPLockedMessage("Archipelago: Survival mode is locked.");
             return;
@@ -119,6 +142,10 @@ simulated function bool CanPlaceTowerUnitCost(int Cost, DunDefPlayerController F
         APGame = class'APGameRuntime'.static.GetForWorld(WorldInfo);
         if(APGame != none && APGame.UnlockState != none)
         {
+            if(APGame.Traps != none && APGame.Traps.SkillJammed()) return false;
+            if(APGame.UnlockState.bChaosLoadouts)
+                return APGame.ChaosRuntime != none && APGame.ChaosRuntime.CanBuild(ForPlayer,TowerArchetype) &&
+                    super.CanPlaceTowerUnitCost(Cost,ForPlayer,TowerArchetype);
             DefenseKey = APGame.UnlockState.GetDefenseKey(TowerArchetype,
                 APGame.UnlockState.GetHeroKey(ForPlayer.GetHero()));
             if(DefenseKey == "")
@@ -169,11 +196,19 @@ simulated function bool ShouldDenyAPAbility(DunDefPlayerAbility Ability)
     }
 
     PC = Ability.GetPC();
+    if(APGame.Traps != none && APGame.Traps.DeniesAbility(Ability)) return true;
     if(!IsHeroAllowed(PC))
     {
         return true;
     }
     HeroKey = APGame.UnlockState.GetHeroKey(PC.GetHero());
+
+    if(APGame.UnlockState.bChaosLoadouts)
+    {
+        if(APGame.ChaosRuntime == none) return true;
+        if(APGame.ChaosRuntime.IsPreserved(PC,Ability)) return false;
+        return !APGame.ChaosRuntime.CanUse(Ability);
+    }
 
     BuildAbility = DunDefPlayerAbility_BuildTower(Ability);
     if(BuildAbility != none)
@@ -219,6 +254,13 @@ simulated function EPlayerAbilityStatus GetPlayerAbilityStatusOverride(DunDefPla
     return super.GetPlayerAbilityStatusOverride(Ability);
 }
 
+function BeganCombatPhase()
+{
+    super.BeganCombatPhase();
+    APActiveCombatWave = WaveNumber;
+    `log("AP:TREASURE_COMBAT_START wave=" $ APActiveCombatWave $ " final=" $ FinalWaveNumber);
+}
+
 function EndedCombatPhase()
 {
     local APGameRuntime APGame;
@@ -226,10 +268,10 @@ function EndedCombatPhase()
 
     if(Role == ROLE_Authority && WorldInfo.NetMode == NM_Standalone && IsGameplayLevel && !IsLobbyLevel)
     {
-        // DD1 advances WaveNumber before EndedCombatPhase runs. Its own
-        // equipment-stat logger uses WaveNumber - 1 for the completed wave.
-        CompletedWave = WaveNumber - 1;
-        if(CompletedWave > LastAPCompletedWave)
+        // Golden Tokens' Kismet does not follow the generic campaign callback
+        // ordering. Use the wave actually entered, not a guessed +/-1 offset.
+        CompletedWave = APActiveCombatWave;
+        if(!bIsGameOver && NumGoldenTokens <= 0 && CompletedWave >= 0 && CompletedWave > LastAPCompletedWave)
         {
             LastAPCompletedWave = CompletedWave;
             `log("AP:WAVE_COMPLETE map=" $ WorldInfo.GetPackageName() $ " wave=" $ CompletedWave $ " difficulty=" $ CurrentGameDifficulty);
@@ -244,36 +286,33 @@ function EndedCombatPhase()
     super.EndedCombatPhase();
 }
 
-defaultproperties
-{
-    LastAPCompletedWave=-1
-    bOverridePlayerAbilityStatus=true
-}
-
 simulated function DoLevelVictory()
 {
     local APGameRuntime APGame;
+    local int CompletedWave;
 
-    // The parent function ignores duplicate authoritative victory calls. Check
-    // its state first so this event follows the same exactly-once behavior.
-    if(!bDoLevelVictory && !bIsGameOver && Role == ROLE_Authority && WorldInfo.NetMode == NM_Standalone && IsGameplayLevel && !IsLobbyLevel)
+    if(!bDoLevelVictory && !bIsGameOver && Role == ROLE_Authority &&
+        WorldInfo.NetMode == NM_Standalone && IsGameplayLevel && !IsLobbyLevel)
     {
-        `log("AP:LEVEL_VICTORY map=" $ WorldInfo.GetPackageName() $ " wave=" $ WaveNumber $ " difficulty=" $ CurrentGameDifficulty);
+        CompletedWave = APActiveCombatWave;
+        if(CompletedWave < 0) CompletedWave = FinalWaveNumber;
         APGame = class'APGameRuntime'.static.GetForWorld(WorldInfo);
         if(APGame != none && APGame.EventBridge != none)
-        {
-            APGame.EventBridge.EmitEvent("level_victory", string(WorldInfo.GetPackageName()), WaveNumber, string(CurrentGameDifficulty));
-        }
+            APGame.EventBridge.EmitEvent("level_victory", string(WorldInfo.GetPackageName()),
+                CompletedWave, string(CurrentGameDifficulty));
     }
 
+    // This class directly extends the native Golden Tokens GRI, so this does
+    // not invoke the generic AP emitter used by the other challenge wrappers.
     super.DoLevelVictory();
-
-    // Vanilla victory records the next campaign map as ordinary local
-    // progress. Reapply AP ownership immediately so it remains hidden and
-    // unselectable until its map item arrives.
     APGame = class'APGameRuntime'.static.GetForWorld(WorldInfo);
     if(APGame != none)
-    {
         APGame.ApplyOwnedMapVisibility();
-    }
+}
+
+defaultproperties
+{
+    LastAPCompletedWave=-1
+    APActiveCombatWave=-1
+    bOverridePlayerAbilityStatus=true
 }

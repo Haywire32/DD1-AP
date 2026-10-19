@@ -1,0 +1,2 @@
+Custom shop artwork supplied by the project owner for use in Dungeon Defenders Archipelago.
+Imported into the game as APLogoNative.Logo.

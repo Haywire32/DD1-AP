@@ -1,39 +1,31 @@
-# Building 0.5.1
+# Game build
 
-Run `python tools/build_apworld.py` from this source folder to build
-`dist/dungeon_defenders.apworld`. It does not install anything. The Python files
-and bundled YAML are copied unchanged from this source.
+Use a separate, compatible DDDK installation with matching script dependencies.
 
-Players use regular Steam DD1, with `-TOTALCONVERSION=DD1ArchipelagoCurrent`.
-The game executable is not modified. The mod only supports Local play.
+Under `TotalConversions/DD1ArchipelagoCurrent/`, copy:
 
-The game scripts were compiled and cooked using a compatible DDDK installation:
+- `game/Classes/*.uc` and `game/BuildOnly/*.uc` to `ProbeSource/DD1Archipelago/Classes/`.
+- `game/BuildConfig/*.ini` to `Config/`.
+- Matching compiled dependencies to `Script/`.
 
-```
-TotalConversions/DD1Features050/
-  ProbeSource/DD1Archipelago/Classes/   game/Classes and game/BuildOnly
-  Script/                             matching compiled dependencies
-  Config/                             game/BuildConfig
-```
+Copy `game/Assets/APLogoNative.upk` to `UDKGame/Content/`.
 
-From the development installation's Binaries/Win64 folder:
+From `Binaries/Win64/`:
 
-```
-DunDefDevelopment.exe make -TOTALCONVERSION=DD1Features050 -unattended -nopause -forcelogflush
-DunDefDevelopment.exe CookPackages DD1Archipelago -platform=PCConsole -TOTALCONVERSION=DD1Features050 -languageforcooking=INT -noloccooking -unattended -nopause -forcelogflush
+```text
+DunDefDevelopment.exe make -TOTALCONVERSION=DD1ArchipelagoCurrent
+DunDefDevelopment.exe CookPackages DD1Archipelago -platform=PCConsole -TOTALCONVERSION=DD1ArchipelagoCurrent -languageforcooking=INT -noloccooking
 ```
 
-Back up the build first. The compiler can remove compiled dependencies when
-their source is absent. Restore those same dependencies before cooking, but
-keep the newly compiled DD1Archipelago.u.
+Back up dependencies before compiling. If the compiler removes them, restore
+those dependencies before cooking, keeping the new `DD1Archipelago.u`.
 
-The AP scripts are in Startup_INT.upk. Ship its matching TC texture/shader caches
-and the working stock dependencies. The player Config files are in release/Config;
-they differ from the developer build paths. APRetailMenuProbe is an unused
-build-only class retained here because it is present in the compiled package.
-The release selects APViewportClient, not that probe.
+Package from a matching release ZIP and the new cooked output:
 
-The manifests record the source and release hashes. No executables, DLLs,
-character saves or videos are included. Bundled game content remains third-party
-content; this is not a claim that every stock dependency can be rebuilt from
-the current DDDK source alone.
+```text
+python tools/build_conversion.py baseline.zip output.zip --cooked path/to/CookedPCConsole
+```
+
+This replaces the mod scripts, texture cache and default configuration while
+preserving the baseline's other game assets. It excludes saves and generated INIs.
+Retail dependencies cannot all be rebuilt from the public DDDK alone.

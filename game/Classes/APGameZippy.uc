@@ -1,6 +1,35 @@
 // Keep the native mission class in the inheritance chain.
 class APGameZippy extends GameInfo_ZippyTerror;
 
+const AP_BASE_DU=12;
+
+static function int DefenseUnitsForBonus(int Bonus)
+{
+    return AP_BASE_DU + Clamp(Bonus,0,30);
+}
+
+function InitGameReplicationInfo()
+{
+    local DunDefGameReplicationInfo GRI;
+    // Preserve the native timer, respawn and mission setup, then replace only
+    // Zippy Terror's zero-DU starting budget. Runtime adds owned DU bonuses.
+    super.InitGameReplicationInfo();
+    GRI = DunDefGameReplicationInfo(GameReplicationInfo);
+    if(GRI != none && WorldInfo.NetMode == NM_Standalone)
+        GRI.MaxTowerUnits = AP_BASE_DU;
+}
+
+// Native main spawns its controller archetype, not PlayerControllerClass.
+// GameInfo.Killed is called by Pawn.Died regardless of that controller class.
+function Killed(Controller Killer, Controller KilledPlayer, Pawn KilledPawn, class<DamageType> DamageType)
+{
+    local APGameRuntime Runtime;
+    Runtime = class'APGameRuntime'.static.GetForWorld(WorldInfo);
+    if(Runtime != none && Runtime.DeathLink != none)
+        Runtime.DeathLink.NotifyDeath(DunDefPlayerController(KilledPlayer), KilledPawn);
+    super.Killed(Killer, KilledPlayer, KilledPawn, DamageType);
+}
+
 event InitGame(string Options, out string ErrorMessage)
 {
     if(WorldInfo.NetMode != NM_Standalone)
@@ -9,6 +38,7 @@ event InitGame(string Options, out string ErrorMessage)
         ConsoleCommand("quit");
         return;
     }
+    class'APMapLoadCompatibility'.static.Restore(WorldInfo);
     super.InitGame(Options, ErrorMessage);
 }
 
@@ -54,5 +84,16 @@ function UpdateGlobalHeroModifiers(DunDefPlayerController PC)
 defaultproperties
 {
     PlayerControllerClass=class'APPlayerController'
+    HUDType=class'APHUD'
     GameReplicationInfoClass=class'APGRIZippy'
+}
+
+// Observe the native crystal-loss path before it changes the GRI to game-over.
+function ShowGameOver(int gameOverDescriptionReason)
+{
+    local APGameRuntime Runtime;
+    Runtime = class'APGameRuntime'.static.GetForWorld(WorldInfo);
+    if(Runtime != none && Runtime.DeathLink != none)
+        Runtime.DeathLink.NotifyGameOver(gameOverDescriptionReason);
+    super.ShowGameOver(gameOverDescriptionReason);
 }

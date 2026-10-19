@@ -67,6 +67,9 @@ function EmitEvent(string EventType, string MapName, int WaveNumber, string Deta
         return;
     MissionTag = class'DunDefHeroManager'.static.GetHeroManager().GetCurrentCampaignLevelEntry().EntryIdentifierTag;
     Mode = GRI.bIsSpecialMission ? "challenge" : (GRI.IsInfiniteWaveMode ? "survival" : "campaign");
+    // CD uses a native special-mission flag for its boss rules, but belongs
+    // to the AP campaign. Do not misroute its victory to the challenge pack.
+    if(MissionTag == "CAMPCL") Mode = "campaign";
     Payload = APGame.UnlockState.SeedIdentity $ "|" $ EventType $ "|" $
         MapName $ "|" $ WaveNumber $ "|" $ Detail $ "|" $ Mode $ "|" $ MissionTag;
     if(PendingEvents.Find(Payload) != INDEX_NONE)

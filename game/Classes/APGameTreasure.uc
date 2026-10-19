@@ -1,6 +1,17 @@
 // Keep the native mission class in the inheritance chain.
 class APGameTreasure extends GameInfo_GoldenTokens;
 
+// Native main spawns its controller archetype, not PlayerControllerClass.
+// GameInfo.Killed is called by Pawn.Died regardless of that controller class.
+function Killed(Controller Killer, Controller KilledPlayer, Pawn KilledPawn, class<DamageType> DamageType)
+{
+    local APGameRuntime Runtime;
+    Runtime = class'APGameRuntime'.static.GetForWorld(WorldInfo);
+    if(Runtime != none && Runtime.DeathLink != none)
+        Runtime.DeathLink.NotifyDeath(DunDefPlayerController(KilledPlayer), KilledPawn);
+    super.Killed(Killer, KilledPlayer, KilledPawn, DamageType);
+}
+
 event InitGame(string Options, out string ErrorMessage)
 {
     if(WorldInfo.NetMode != NM_Standalone)
@@ -9,6 +20,7 @@ event InitGame(string Options, out string ErrorMessage)
         ConsoleCommand("quit");
         return;
     }
+    class'APMapLoadCompatibility'.static.Restore(WorldInfo);
     super.InitGame(Options, ErrorMessage);
 }
 
@@ -54,5 +66,16 @@ function UpdateGlobalHeroModifiers(DunDefPlayerController PC)
 defaultproperties
 {
     PlayerControllerClass=class'APPlayerController'
+    HUDType=class'APHUD'
     GameReplicationInfoClass=class'APGRITreasure'
+}
+
+// Observe the native crystal-loss path before it changes the GRI to game-over.
+function ShowGameOver(int gameOverDescriptionReason)
+{
+    local APGameRuntime Runtime;
+    Runtime = class'APGameRuntime'.static.GetForWorld(WorldInfo);
+    if(Runtime != none && Runtime.DeathLink != none)
+        Runtime.DeathLink.NotifyGameOver(gameOverDescriptionReason);
+    super.ShowGameOver(gameOverDescriptionReason);
 }

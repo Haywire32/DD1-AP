@@ -74,9 +74,6 @@ function ApplyAPOnlineGuards()
         if(Menu.MultiplayerButton.IsEnabled(0, false))
             Menu.MultiplayerButton.SetEnabled(false, 0);
         Menu.MultiplayerButton.OnClicked = RejectAPOnlineClick;
-        // The menu's keyboard/controller handler can activate its focused
-        // control directly, without going through the button's OnClicked.
-        Menu.OnInterceptRawInputKey = GuardAPMainMenuInput;
         if(Menu.GetFocusedControl(true, 0) == Menu.MultiplayerButton)
             Menu.PlayButton.SetFocus(none, 0);
     }
@@ -85,22 +82,6 @@ function ApplyAPOnlineGuards()
 function bool RejectAPOnlineClick(UIScreenObject Sender, int PlayerIndex)
 {
     return true;
-}
-
-function bool GuardAPMainMenuInput(const out InputEventParameters EventParms)
-{
-    local UI_MainMenu Menu;
-    if(!IsAPLocalSession())
-        return true;
-    Menu = UI_MainMenu(GetActiveUISceneFromClass(class'UI_MainMenu'));
-    if(Menu == none)
-        return true;
-    if(Menu.GetFocusedControl(true, 0) == Menu.MultiplayerButton)
-    {
-        Menu.PlayButton.SetFocus(none, 0);
-        return true;
-    }
-    return Menu.OnReceivedInputKey(EventParms);
 }
 
 // Ignore native invite callbacks even before the next tick removes delegates.

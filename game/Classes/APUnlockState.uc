@@ -2,18 +2,83 @@ class APUnlockState extends Object
     config(DD1ArchipelagoUnlocks);
 
 var config int Revision;
+// Private Linux transport test. No gameplay/seed semantics change.
+var config bool bReverseBridge;
 var config string Slot;
 var config string SeedIdentity;
+var config bool bChaosLoadouts;
+var config string ChaosMappingToken;
+var config int ChaosPlayerSlot;
 var config array<string> UnlockedHeroes;
 var config array<string> ActiveHeroes;
 var config array<string> LevelSixHeroes;
 var config array<string> UnlockedDefenses;
 var config array<string> UnlockedAbilities;
 var config array<string> UnlockedMaps;
+var config array<string> ActiveMaps;
+var config array<string> UnlockedHeroSkins;
+var config int HeroSkinMode;
 var config int MaxEquipmentQuality;
 var config int ExperienceMultiplier;
+var config int LevelCatchUpMultiplier;
 var config int DifficultyMask;
 var config int ModeMask;
+var config int StartingCrystalRoll;
+var config int BuildTimeSeconds;
+var config int DefenseUnitsBonus;
+var config int SurvivalStartWave;
+var config int CrystalSkinMask;
+// -1 preserves native display outside randomized Eternia Shard seeds.
+var config int EterniaShardMask;
+var config bool bShopsanity;
+var config bool bRandomGearPets;
+var config bool bTavernThemes;
+var config int TavernThemeMask;
+// Cumulative reward counts are also persisted for the cross-platform file bridge.
+var config int ReceivedXPRewards;
+var config int ReceivedManaRewards;
+var config int ReceivedGearRewards;
+
+// Copy values, not the old world's actor-owned object. The viewport retains
+// this snapshot across seamless travel; it never writes the client's INI.
+function CopyFrom(APUnlockState Source)
+{
+    if(Source == none || Source == self) return;
+    Revision = Source.Revision;
+    bReverseBridge = Source.bReverseBridge;
+    Slot = Source.Slot;
+    SeedIdentity = Source.SeedIdentity;
+    bChaosLoadouts = Source.bChaosLoadouts;
+    ChaosMappingToken = Source.ChaosMappingToken;
+    ChaosPlayerSlot = Source.ChaosPlayerSlot;
+    UnlockedHeroes = Source.UnlockedHeroes;
+    ActiveHeroes = Source.ActiveHeroes;
+    LevelSixHeroes = Source.LevelSixHeroes;
+    UnlockedDefenses = Source.UnlockedDefenses;
+    UnlockedAbilities = Source.UnlockedAbilities;
+    UnlockedMaps = Source.UnlockedMaps;
+    ActiveMaps = Source.ActiveMaps;
+    UnlockedHeroSkins = Source.UnlockedHeroSkins;
+    HeroSkinMode = Source.HeroSkinMode;
+    MaxEquipmentQuality = Source.MaxEquipmentQuality;
+    ExperienceMultiplier = Source.ExperienceMultiplier;
+    LevelCatchUpMultiplier = Source.LevelCatchUpMultiplier;
+    DifficultyMask = Source.DifficultyMask;
+    ModeMask = Source.ModeMask;
+    StartingCrystalRoll = Source.StartingCrystalRoll;
+    BuildTimeSeconds = Source.BuildTimeSeconds;
+    DefenseUnitsBonus = Source.DefenseUnitsBonus;
+    SurvivalStartWave = Source.SurvivalStartWave;
+    CrystalSkinMask = Source.CrystalSkinMask;
+    EterniaShardMask = Source.EterniaShardMask;
+    bShopsanity = Source.bShopsanity;
+    bRandomGearPets = Source.bRandomGearPets;
+    bTavernThemes = Source.bTavernThemes;
+    TavernThemeMask = Source.TavernThemeMask;
+    ReceivedXPRewards = Source.ReceivedXPRewards;
+    ReceivedManaRewards = Source.ReceivedManaRewards;
+    ReceivedGearRewards = Source.ReceivedGearRewards;
+}
 
 function bool ContainsValue(const out array<string> Values, string Wanted)
 {
@@ -36,12 +101,14 @@ function bool IsHeroUnlocked(string HeroKey)
 
 function string GetHeroKey(DunDefHero Hero)
 {
-    if(Hero == none || Hero.GetCurrentHeroTemplate() == none)
-    {
-        return "";
-    }
+    if(Hero == none) return "";
+    return GetTemplateHeroKey(Hero.GetCurrentHeroTemplate());
+}
 
-    switch(Hero.GetCurrentHeroTemplate().MyHeroClass)
+function string GetTemplateHeroKey(DunDefHero Template)
+{
+    if(Template == none) return "";
+    switch(Template.MyHeroClass)
     {
         case EHC_APPRENTICE: return "apprentice";
         case EHC_SQUIRE: return "squire";
@@ -461,6 +528,12 @@ function bool IsBasicAbility(DunDefPlayerAbility Ability, string HeroKey)
     }
     ArchetypePath = PathName(Ability.ObjectArchetype);
 
+    return IsBasicAbilityPath(ArchetypePath,HeroKey);
+}
+
+function bool IsBasicAbilityPath(string ArchetypePath, string HeroKey)
+{
+
     // These are ordinary controls, not randomized hero skills.
     if(ArchetypePath ~= "DunDefPlayers.Abilities.Ability_HealSelf" ||
         ArchetypePath ~= "DunDefPlayers.Abilities.Ability_RepairTower" ||
@@ -497,16 +570,52 @@ function bool IsBasicAbility(DunDefPlayerAbility Ability, string HeroKey)
 
 function bool IsMapUnlocked(string CampaignTag)
 {
+    if(!IsRandomizerMap(CampaignTag)) return false;
     if(Left(CampaignTag, 4) == "SPEC")
-        return (ModeMask & 2) != 0 && IsRandomizerMap(CampaignTag) &&
-            ContainsValue(UnlockedMaps, "CAMP" $ Mid(CampaignTag, 4));
+        return IsAreaUnlocked(CampaignTag, true) &&
+            ((ModeMask & 64) == 0 || ContainsValue(UnlockedMaps, "CAMP" $ Mid(CampaignTag, 4)));
     return ContainsValue(UnlockedMaps, CampaignTag);
+}
+
+function int GetMapArea(string Tag)
+{
+    if(Left(Tag, 4) == "SPEC") Tag = "CAMP" $ Mid(Tag, 4);
+    if(Tag == "CAMPDW" || Tag == "CAMPFF" || Tag == "CAMPMQ" || Tag == "CAMPAL") return 0;
+    if(Tag == "CAMPSQ" || Tag == "CAMPCA" || Tag == "CAMPHC" || Tag == "CAMPTR") return 1;
+    if(Tag == "CAMPRG" || Tag == "CAMPRP" || Tag == "CAMPES" || Tag == "CAMPTS") return 2;
+    if(Tag == "CDTCDD") return 0;
+    if(ContainsValue(ActiveMaps, Tag) && Tag != "CAMPCL") return 2;
+    return -1;
+}
+
+function bool IsAreaUnlocked(string Tag, bool bChallenge)
+{
+    local int Area;
+    Area = GetMapArea(Tag);
+    if(Area < 0) return false;
+    return (ModeMask & (1 << (Area + (bChallenge ? 3 : 0)))) != 0;
+}
+
+function bool IsSurvivalUnlocked(string Tag)
+{
+    if(Tag == "CAMPCL") return false;
+    return IsMapUnlocked(Tag) && IsAreaUnlocked(Tag, false);
 }
 
 function bool IsRandomizerMap(string CampaignTag)
 {
     if(Left(CampaignTag, 4) == "SPEC")
+    {
         CampaignTag = "CAMP" $ Mid(CampaignTag, 4);
+        // Only the original twelve matching challenges are supported.
+        return CampaignTag == "CAMPDW" || CampaignTag == "CAMPFF" ||
+            CampaignTag == "CAMPMQ" || CampaignTag == "CAMPAL" ||
+            CampaignTag == "CAMPSQ" || CampaignTag == "CAMPCA" ||
+            CampaignTag == "CAMPHC" || CampaignTag == "CAMPTR" ||
+            CampaignTag == "CAMPRG" || CampaignTag == "CAMPRP" ||
+            CampaignTag == "CAMPES" || CampaignTag == "CAMPTS";
+    }
+    if(ActiveMaps.Length > 0) return ContainsValue(ActiveMaps, CampaignTag);
     return CampaignTag == "CAMPDW" || CampaignTag == "CAMPFF" ||
         CampaignTag == "CAMPMQ" || CampaignTag == "CAMPAL" ||
         CampaignTag == "CAMPSQ" || CampaignTag == "CAMPCA" ||
@@ -517,7 +626,9 @@ function bool IsRandomizerMap(string CampaignTag)
 
 function bool IsDifficultyUnlocked(int Difficulty)
 {
-    if(Difficulty < 0 || Difficulty > 3)
+    if(Difficulty < 0 || Difficulty > 5)
+        return false;
+    if(Difficulty >= 4 && !class'DunDefHeroManager'.static.GetHeroManager().bNightmareUnlocked)
         return false;
     return (DifficultyMask & (1 << Difficulty)) != 0;
 }
@@ -588,4 +699,7 @@ defaultproperties
     Slot="Unconfigured"
     MaxEquipmentQuality=0
     ExperienceMultiplier=1
+    LevelCatchUpMultiplier=1
+    SurvivalStartWave=-1
+    EterniaShardMask=-1
 }

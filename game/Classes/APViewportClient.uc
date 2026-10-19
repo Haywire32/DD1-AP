@@ -1,6 +1,9 @@
 class APViewportClient extends APLocalViewportClient;
 
 var APUnlockState MenuUnlockState;
+var APSeedPresentation SeedPresentation;
+var APDisplayRepair DisplayRepair;
+var APChaosStats ChaosStats;
 var bool bShowedAPStartingItems;
 var float APStartupNoticeDelay;
 var bool bInstalledAPInputGuard;
@@ -14,6 +17,306 @@ struct APButtonGuard
 };
 
 var array<APButtonGuard> APButtonGuards;
+var APShopState ShopState;
+var APShopPresentation ShopPresentation;
+var APShopTooltipGuard ShopTooltipGuard;
+var array<APShopView> ShopViews;
+var array<APSurvivalSelection> SurvivalViews;
+var array<APMapMenu> MapViews;
+var APHeroRosterPresentation HeroRosterPresentation;
+var float APSkinRefreshDelay;
+var WorldInfo APCostumeWorld;
+var float APNextNativeAwardScan;
+
+static function float GetSafeAPGamma(float Value)
+{
+    // Early private builds inherited a zero viewport gamma. DD1 copies that
+    // into new profiles and reapplies it after loading, ignoring DisplayGamma
+    // in Engine.ini. Repair only that invalid value, not valid user settings.
+    if(!(Value > 0.0)) return 2.2;
+    return Value;
+}
+
+function SetGamma(float Value)
+{
+    super.SetGamma(GetSafeAPGamma(Value));
+}
+
+function APMapMenu GetMapView(UI_GameSetup Scene)
+{
+    local int I;
+    local APMapMenu View;
+    for(I = MapViews.Length - 1; I >= 0; I--)
+    {
+        if(!IsSceneInstanceOpened(MapViews[I].Scene)) MapViews.Remove(I, 1);
+        else if(MapViews[I].Scene == Scene) return MapViews[I];
+    }
+    View = new(self) class'APMapMenu';
+    View.Scene = Scene;
+    MapViews.AddItem(View);
+    return View;
+}
+
+function APSurvivalSelection GetSurvivalView(UI_GameSetup Scene)
+{
+    local int I;
+    local APSurvivalSelection View;
+    for(I = SurvivalViews.Length - 1; I >= 0; I--)
+    {
+        if(!IsSceneInstanceOpened(SurvivalViews[I].Scene)) SurvivalViews.Remove(I, 1);
+        else if(SurvivalViews[I].Scene == Scene) return SurvivalViews[I];
+    }
+    View = new(self) class'APSurvivalSelection';
+    View.Scene = Scene;
+    SurvivalViews.AddItem(View);
+    return View;
+}
+
+function APShopView GetShopView(UI_Shop Scene)
+{
+    local int I;
+    local APShopView View;
+    for(I = ShopViews.Length - 1; I >= 0; I--)
+    {
+        if(!IsSceneInstanceOpened(ShopViews[I].Scene))
+        {
+            ShopViews[I].RestoreIcons();
+            ShopViews.Remove(I, 1);
+        }
+        else if(ShopViews[I].Scene == Scene) return ShopViews[I];
+    }
+    View = new(self) class'APShopView';
+    View.Scene = Scene;
+    for(I = 0; I < 3 && I < Scene.EquipmentItemButtons.Length; I++)
+        View.CategoryNames[I] = Scene.EquipmentItemButtons[I].DisplayString;
+    ShopViews.AddItem(View);
+    return View;
+}
+
+function bool APShopSwitchClicked(UIScreenObject Sender, int PlayerIndex)
+{
+    local UI_Shop Scene;
+    local APShopView View;
+    local int I;
+    Scene = UI_Shop(UIObject(Sender).GetScene());
+    if(Scene == none || Scene.bShowingDeletionConfirmation) return true;
+    View = GetShopView(Scene);
+    if(Scene.ServicesPanel.IsVisible())
+    {
+        Scene.NotifyWidgetClicked(Scene.ItemShopButton);
+        return true;
+    }
+    View.bArchipelago = !View.bArchipelago;
+    Scene.LastSelectedEntry = none;
+    if(Scene.myEquipmentInfoScene != none)
+    {
+        Scene.myEquipmentInfoScene.CloseScene();
+        Scene.myEquipmentInfoScene = none;
+    }
+    if(!View.bArchipelago)
+    {
+        View.UpdateCategories(false);
+        View.RestoreIcons();
+        for(I = 0; I < 3 && I < Scene.EquipmentItemButtons.Length; I++)
+            Scene.EquipmentItemButtons[I].DisplayString = View.CategoryNames[I];
+        Scene.RefreshEquipmentList();
+    }
+    UpdateAPShop();
+    return true;
+}
+
+event PostRender(Canvas C)
+{
+    local array<DunDefUIScene> Scenes;
+    local DunDefUIScene ActiveScene;
+    local UI_Shop Scene;
+    local UI_HeroSelection Selection;
+    local UI_SwapHero Swap;
+    local UIPanel_DataList HeroList;
+    if(HeroRosterPresentation == none) HeroRosterPresentation = new(self) class'APHeroRosterPresentation';
+    Scenes = GetActiveUIScenesFromClass(class'DunDefUIScene');
+    foreach Scenes(ActiveScene)
+    {
+        if(!ActiveScene.IsTopLevelScene()) continue;
+        Selection = UI_HeroSelection(ActiveScene);
+        Swap = UI_SwapHero(ActiveScene);
+        HeroList = none;
+        if(Selection != none && !Selection.bShowingDeletionConfirmation) HeroList = Selection.HeroDataList;
+        if(Swap != none && !Swap.bShowingDeletionConfirmation) HeroList = Swap.HeroDataList;
+        if(HeroList != none) HeroRosterPresentation.DrawRoster(C, HeroList, GetMenuUnlockState());
+    }
+    // Draw the AP shop additions before DD1's normal viewport pass.  The shop
+    // is already on screen here, while the stock sword cursor is drawn later
+    // by the parent, so the cursor remains visible over the AP logo.
+    if(ShopState != none && ShopState.bEnabled)
+    {
+        if(ShopPresentation == none) ShopPresentation = new(self) class'APShopPresentation';
+        Scenes = GetActiveUIScenesFromClass(class'UI_Shop');
+        foreach Scenes(ActiveScene)
+        {
+            Scene = UI_Shop(ActiveScene);
+            if(Scene != none && Scene.IsTopLevelScene() && GetShopView(Scene).bArchipelago)
+                ShopPresentation.Draw(C, Scene, ShopState);
+        }
+    }
+    super.PostRender(C);
+}
+
+function APShopState GetShopState()
+{
+    local APUnlockState Permissions;
+    if(ShopState == none) ShopState = new(self) class'APShopState';
+    Permissions = GetMenuUnlockState();
+    if(Permissions != none) ShopState.bEnabled = Permissions.bShopsanity;
+    return ShopState;
+}
+
+function bool APShopButtonClicked(UIScreenObject Sender, int PlayerIndex)
+{
+    local UI_Shop Scene;
+    local APShopEquipment Token;
+    local HeroEquipment Equipment;
+    Scene = UI_Shop(UIObject(Sender).GetScene());
+    if(Scene == none || !GetShopState().bEnabled) return true;
+    if(!GetShopView(Scene).bArchipelago)
+        return Scene.NotifyWidgetClicked(UIObject(Sender));
+    if(Sender == Scene.ConfirmDeletionButton)
+    {
+        Token = APShopEquipment(Scene.ConfirmBuyEquipmentItem);
+        GetShopState().Purchase(Token, DunDefPlayerController(Scene.PlayerOwner.Actor));
+        Scene.NotifyWidgetClicked(Scene.CancelDeletionButton);
+        GetShopState().RefreshInventory();
+        Scene.EquipmentDataList.InitFromDataListProvider(ShopState, GetShopView(Scene).SelectedCategory(),,,,,false,,,true);
+        return true;
+    }
+    if(Sender == Scene.BuyItemButton)
+    {
+        Equipment = Scene.EquipmentDataList.GetSelectedEntry();
+        Token = APShopEquipment(Equipment);
+        if(Token != none && GetShopState().Available(Token.PurchaseIndex))
+            Scene.ShowDeletionConfirmation(Token);
+        return true;
+    }
+    // AP purchases are not ordinary equipment: no locking or equipment popup.
+    return true;
+}
+
+function bool APShopPlatinumClicked(UIScreenObject Sender, int PlayerIndex)
+{
+    local UI_Shop Scene;
+    Scene=UI_Shop(UIObject(Sender).GetScene());
+    if(Scene == none || Scene.bShowingDeletionConfirmation || !GetShopState().bPlatinum || !GetShopView(Scene).bArchipelago) return true;
+    GetShopView(Scene).SelectPlatinum();
+    UpdateAPShop();
+    return true;
+}
+
+function UpdateAPShop()
+{
+    local array<DunDefUIScene> Scenes;
+    local DunDefUIScene ActiveScene;
+    local UI_Shop Scene;
+    local APShopEquipment Token;
+    local HeroEquipment Equipment;
+    local UIScriptWidget_EquipmentIconButton Button;
+    local bool Changed;
+    local int Index;
+    local HUDPrefabContainer Overlay;
+    local DunDefPlayerController ShopPC;
+    local APShopView View;
+    if(ShopTooltipGuard==none) ShopTooltipGuard=new(self) class'APShopTooltipGuard';
+    ShopTooltipGuard.RestoreReusedOverlays();
+    if(!GetShopState().bEnabled) return;
+    Changed = ShopState.RefreshInventory();
+    ShopState.RepairJournal(class'APGameRuntime'.static.GetForWorld(GetCurrentWorldInfo()));
+    Scenes = GetActiveUIScenesFromClass(class'UI_Shop');
+    foreach Scenes(ActiveScene)
+    {
+        Scene = UI_Shop(ActiveScene);
+        if(Scene.EquipmentDataList == none) continue;
+        View = GetShopView(Scene);
+        View.CreateSwitch();
+        View.UpdateCategories(ShopState.bPlatinum);
+        if(View.PlatinumButton != none) View.PlatinumButton.OnClicked=APShopPlatinumClicked;
+        if(View.SwitchButton != none)
+        {
+            View.SwitchButton.OnClicked = APShopSwitchClicked;
+            View.SwitchButton.DisplayString = View.bArchipelago ? "Normal Shop" : "Archipelago Shop";
+            View.SwitchButton.SetVisibility(!Scene.bShowingDeletionConfirmation);
+            SetAPButtonEnabled(View.SwitchButton, !Scene.bShowingDeletionConfirmation, Scene.GetPlayerOwnerIndex());
+        }
+        Scene.BuyItemButton.OnClicked = APShopButtonClicked;
+        Scene.ConfirmDeletionButton.OnClicked = APShopButtonClicked;
+        Scene.LockButton.OnClicked = APShopButtonClicked;
+        Scene.ItemInfoButton.OnClicked = APShopButtonClicked;
+        if(!View.bArchipelago) continue;
+        View.RememberIcons();
+        if(Scene.EquipmentItemButtons.Length >= 3)
+        {
+            Scene.EquipmentItemButtons[0].DisplayString = "Bronze";
+            Scene.EquipmentItemButtons[1].DisplayString = "Silver";
+            Scene.EquipmentItemButtons[2].DisplayString = "Gold";
+        }
+        // An unselected list is normal; rebuilding it every tick steals tab clicks.
+        if(Changed || Scene.EquipmentDataList.theDataListProvider != ShopState
+            || Scene.EquipmentDataList.DataSetType != View.SelectedCategory())
+            Scene.EquipmentDataList.InitFromDataListProvider(ShopState, View.SelectedCategory(),,,,,false,,,true);
+        Scene.BuyItemButton.OnClicked = APShopButtonClicked;
+        Scene.ConfirmDeletionButton.OnClicked = APShopButtonClicked;
+        Scene.LockButton.OnClicked = APShopButtonClicked;
+        Scene.ItemInfoButton.OnClicked = APShopButtonClicked;
+        SetAPButtonEnabled(Scene.LockButton, false, Scene.GetPlayerOwnerIndex());
+        SetAPButtonEnabled(Scene.ItemInfoButton, false, Scene.GetPlayerOwnerIndex());
+        Equipment = Scene.EquipmentDataList.GetSelectedEntry();
+        Token = APShopEquipment(Equipment);
+        SetAPButtonEnabled(Scene.BuyItemButton, Token != none && ShopState.Available(Token.PurchaseIndex)
+            && DunDefPlayerController(Scene.PlayerOwner.Actor).GetBankedManaItemBox() >= Token.GetShopWorth(), Scene.GetPlayerOwnerIndex());
+        if(Token == none) Token = ShopState.Tokens[Clamp(View.SelectedCategory(), 0, ShopState.CategoryCount()-1) * 3];
+        if(Scene.BankDescriptionLabel != none) Scene.BankDescriptionLabel.SetValue("Banked Mana");
+        ShopPC = DunDefPlayerController(Scene.PlayerOwner.Actor);
+        if(ShopPC != none && ShopPC.HUDScene != none)
+            foreach ShopPC.HUDScene.containers(Overlay)
+                if(Overlay != none && APShopEquipment(Overlay.associatedObject) != none)
+                    ShopTooltipGuard.HideTokenOverlay(Overlay);
+        for(Index = 0; Index < Scene.EquipmentDataList.Buttons_DataListEntry.Length; Index++)
+        {
+            Button = UIScriptWidget_EquipmentIconButton(Scene.EquipmentDataList.Buttons_DataListEntry[Index]);
+            if(Button == none) continue;
+            Button.bAllowDragging = false;
+            Button.bDrawTextName = true;
+            Button.bIsQualityOutlineEnabled = false;
+            Button.bUseTooltip = false;
+            Button.bWrapText = true;
+            if(Button.MyDataContainer != none) Button.MyDataContainer.bCompareStats = false;
+            Button.ComparisonToolTipFocusTime = 999999;
+            Button.LockedOverlay = none;
+        }
+    }
+}
+
+function RememberUnlockState(APUnlockState Source)
+{
+    if(Source == none || Source.SeedIdentity == "") return;
+    if(MenuUnlockState == none)
+        MenuUnlockState = new(self) class'APUnlockState';
+    if(MenuUnlockState.SeedIdentity != Source.SeedIdentity ||
+        Source.Revision < MenuUnlockState.Revision) return;
+    MenuUnlockState.CopyFrom(Source);
+}
+
+function APUnlockState GetTravelUnlockState()
+{
+    local APUnlockState Fresh;
+    // Pin this process to its original seed before refreshing the config cache.
+    if(MenuUnlockState == none)
+        MenuUnlockState = new(self) class'APUnlockState';
+    ConsoleCommand("ReloadCfg DD1Archipelago.APUnlockState");
+    Fresh = new(self) class'APUnlockState';
+    if(Fresh.SeedIdentity == MenuUnlockState.SeedIdentity &&
+        Fresh.Revision > MenuUnlockState.Revision)
+        MenuUnlockState.CopyFrom(Fresh);
+    return MenuUnlockState;
+}
 
 function APUnlockState GetMenuUnlockState()
 {
@@ -22,11 +325,11 @@ function APUnlockState GetMenuUnlockState()
     if(GetCurrentWorldInfo() != none)
         APGame = class'APGameRuntime'.static.GetForWorld(GetCurrentWorldInfo());
     // Use the live snapshot, not the startup object's copy, during play.
-    if(APGame != none)
+    if(APGame != none && APGame.UnlockState != none)
         return APGame.UnlockState;
 
-    // Frontend fallback is the seed configuration loaded at game startup.
-    // Switching seeds requires a new game process; do not reuse this for play.
+    // The session snapshot survives travel and returning to hero selection.
+    // Switching seeds still requires a new process.
     if(MenuUnlockState == none)
         MenuUnlockState = new(self) class'APUnlockState';
     return MenuUnlockState;
@@ -36,11 +339,13 @@ function string GetHeroBlockReason(DunDefHero Hero, bool bCreating)
 {
     local APUnlockState Permissions;
     local string HeroKey;
+    local APChaosConfig Chaos;
+    local string ChaosReason;
 
     Permissions = GetMenuUnlockState();
     if(Permissions == none)
         return "Archipelago is waiting for this seed's hero permissions.";
-    HeroKey = Permissions.GetHeroKey(Hero);
+    HeroKey = bCreating ? Permissions.GetTemplateHeroKey(Hero) : Permissions.GetHeroKey(Hero);
     if(HeroKey == "")
         return "Archipelago cannot identify this hero in the current game build.";
     if(!class'APHeroEntitlements'.static.IsHeroLicensed(HeroKey))
@@ -51,10 +356,19 @@ function string GetHeroBlockReason(DunDefHero Hero, bool bCreating)
     // The original creation callbacks still check native hero/costume locks.
     if(bCreating)
         return "";
+    if(!class'APTavernThemes'.static.IsSeedLicensed(Permissions))
+        return "This seed enables tavern themes and requires ownership of all four Lost Eternia Shards DLC parts.";
+    if(Permissions.bChaosLoadouts)
+    {
+        Chaos = new(self) class'APChaosConfig';
+        if(!Chaos.Validate(Permissions,ChaosReason)) return ChaosReason;
+    }
     if(!Permissions.ContainsValue(Permissions.ActiveHeroes, HeroKey))
         return Permissions.GetHeroDisplayName(HeroKey) $ " is not active in this seed.";
     if(!Permissions.IsHeroUnlocked(HeroKey))
         return Permissions.GetHeroDisplayName(HeroKey) $ " has not been unlocked in Archipelago yet.";
+    if(!class'APHeroSkins'.static.IsAllowed(Permissions, Hero, Hero.CurrentCostumeIndex))
+        return "This hero skin is locked. Choose an unlocked skin or the default appearance.";
     return "";
 }
 
@@ -79,7 +393,11 @@ function string GetSceneHeroBlockReason(DunDefUIScene Scene)
 
     Creation = UI_CreateHeroBase(Scene);
     if(Creation != none)
+    {
+        if(!class'APHeroSkins'.static.IsAllowed(GetMenuUnlockState(), GetCreatingHero(Creation), Creation.CurrentCostumeIndex, true))
+            return "This hero skin requires its Archipelago unlock and any associated DLC.";
         return GetHeroBlockReason(GetCreatingHero(Creation), true);
+    }
     Selection = UI_HeroSelection(Scene);
     if(Selection != none && Selection.HeroDataList != none)
         return GetHeroBlockReason(Selection.HeroDataList.GetSelectedEntry(), false);
@@ -186,6 +504,7 @@ function UpdateMapMenuNavigation(UI_GameSetup Scene)
     APGame = class'APGameRuntime'.static.GetForWorld(Scene.GetWorldInfo());
     if(APGame == none || APGame.UnlockState == none)
         return;
+    GetMapView(Scene).Update(APGame.UnlockState);
     for(DifficultyIndex = 0; DifficultyIndex < Scene.DifficultyButtons.Length; DifficultyIndex++)
     {
         if(Scene.DifficultyButtons[DifficultyIndex] != none)
@@ -202,25 +521,46 @@ function UpdateMapMenuNavigation(UI_GameSetup Scene)
     SelectedEntry = CampaignLevelEntryObject(Scene.MapDataList.GetSelectedButton().MyDataListEntry);
     if(SelectedEntry == none)
         return;
-    bSurvivalAllowed = Left(SelectedEntry.MyLevelEntry.EntryIdentifierTag, 4) == "CAMP" &&
+    bSurvivalAllowed = Left(SelectedEntry.MyLevelEntry.EntryIdentifierTag, 4) != "SPEC" &&
+        SelectedEntry.MyLevelEntry.EntryIdentifierTag != "CAMPCL" &&
         APGame.UnlockState.IsMapUnlocked(SelectedEntry.MyLevelEntry.EntryIdentifierTag);
     if(Scene.SurvivalCheckBox != none)
     {
         Scene.SurvivalCheckBox.SetVisibility(bSurvivalAllowed);
         SetAPButtonEnabled(Scene.SurvivalCheckBox, bSurvivalAllowed &&
-            (APGame.UnlockState.ModeMask & 1) != 0, PlayerIndex);
+            APGame.UnlockState.IsSurvivalUnlocked(SelectedEntry.MyLevelEntry.EntryIdentifierTag), PlayerIndex);
     }
     if(Scene.SurvivalModePanel != none)
         Scene.SurvivalModePanel.SetVisibility(bSurvivalAllowed);
     SetAPButtonEnabled(Scene.InfiniteWaveCheckbox, bSurvivalAllowed &&
-        (APGame.UnlockState.ModeMask & 1) != 0, PlayerIndex);
+        APGame.UnlockState.IsSurvivalUnlocked(SelectedEntry.MyLevelEntry.EntryIdentifierTag), PlayerIndex);
     if(Scene.PureStrategyCheckbox != none)
         Scene.PureStrategyCheckbox.SetVisibility(false);
-    // This check pack starts at wave one, so do not offer a misleading skip.
-    if(Scene.StartAtWaveIncreaseButton != none)
-        Scene.StartAtWaveIncreaseButton.SetVisibility(false);
-    if(Scene.StartAtWaveDecreaseButton != none)
-        Scene.StartAtWaveDecreaseButton.SetVisibility(false);
+    if(APGame.UnlockState.SurvivalStartWave >= 1)
+        GetSurvivalView(Scene).Update(APGame.UnlockState, bSurvivalAllowed &&
+            APGame.UnlockState.IsSurvivalUnlocked(SelectedEntry.MyLevelEntry.EntryIdentifierTag) &&
+            Scene.InfiniteWaveCheckbox.IsChecked());
+    else
+    {
+        // Native SetDifficulty/SelectedLevel hides these until that specific
+        // campaign difficulty is beaten. AP already owns the map/mode gate:
+        // restore the controls on Insane+ too, without inventing wave records.
+        bSurvivalAllowed = bSurvivalAllowed &&
+            APGame.UnlockState.IsSurvivalUnlocked(SelectedEntry.MyLevelEntry.EntryIdentifierTag) &&
+            Scene.InfiniteWaveCheckbox.IsChecked();
+        if(Scene.StartAtWaveLabel != none)
+            Scene.StartAtWaveLabel.SetVisibility(bSurvivalAllowed);
+        if(Scene.StartAtWaveIncreaseButton != none)
+        {
+            Scene.StartAtWaveIncreaseButton.SetVisibility(bSurvivalAllowed);
+            SetAPButtonEnabled(Scene.StartAtWaveIncreaseButton, bSurvivalAllowed, PlayerIndex);
+        }
+        if(Scene.StartAtWaveDecreaseButton != none)
+        {
+            Scene.StartAtWaveDecreaseButton.SetVisibility(bSurvivalAllowed);
+            SetAPButtonEnabled(Scene.StartAtWaveDecreaseButton, bSurvivalAllowed, PlayerIndex);
+        }
+    }
 }
 
 function int GetInstantHeroOffset(name Key)
@@ -333,6 +673,7 @@ function UpdateHeroMenuGuards()
     local DunDefHero Hero;
     local int Index;
     local bool bVanillaAllowed;
+    local UIScriptWidget_EquipmentIconButton EquipmentFocus;
 
     if(theSceneClient == none)
         return;
@@ -350,6 +691,20 @@ function UpdateHeroMenuGuards()
     Scenes = GetActiveUIScenesFromClass(class'DunDefUIScene');
     foreach Scenes(Scene)
     {
+        // Native free-input scenes look up focus for player zero. In split
+        // screen this can leave the owning player's equipment tooltip unfocused.
+        // Only repair that display cache, not focus ownership or input routing.
+        if(Scene.IsTopLevelScene() && Scene.GetPlayerOwnerIndex() > 0)
+        {
+            EquipmentFocus = UIScriptWidget_EquipmentIconButton(Scene.GetFocusedControl(true, Scene.GetPlayerOwnerIndex()));
+            if(EquipmentFocus != none && EquipmentFocus.GetEquipment() != none &&
+                APShopEquipment(EquipmentFocus.GetEquipment()) == none && EquipmentFocus.IsVisible(true))
+            {
+                Scene.lastFocusedControl = EquipmentFocus;
+                if(EquipmentFocus.LastFocusedTime < 0)
+                    EquipmentFocus.LastFocusedTime = GetCurrentWorldInfo().RealTimeSeconds;
+            }
+        }
         UpdateMapMenuNavigation(UI_GameSetup(Scene));
         Selection = UI_HeroSelection(Scene);
         Swap = UI_SwapHero(Scene);
@@ -359,12 +714,12 @@ function UpdateHeroMenuGuards()
         {
             GuardHeroButton(Selection.ConfirmButton, Scene);
             Hero = Selection.HeroDataList.GetSelectedEntry();
-            // These are the original selection/confirmation preconditions.
-            // Restore the button on live AP unlock without mutating the hero list.
+            // Keep native selection preconditions. APHeroButtonClicked and the
+            // keyboard/controller guard deny entry and explain the AP/DLC lock.
+            // A disabled button cannot receive a click to display that reason.
             bVanillaAllowed = Hero != none &&
                 (Hero.ActivePlayer == none || Hero.ActivePlayer == Scene.PlayerOwner);
-            SetAPButtonEnabled(Selection.ConfirmButton, bVanillaAllowed &&
-                GetHeroBlockReason(Hero, false) == "", Scene.GetPlayerOwnerIndex());
+            SetAPButtonEnabled(Selection.ConfirmButton, bVanillaAllowed, Scene.GetPlayerOwnerIndex());
         }
         else if(Swap != none && Swap.HeroDataList != none && Swap.SwapButton != none)
         {
@@ -373,8 +728,7 @@ function UpdateHeroMenuGuards()
             bVanillaAllowed = Hero != none &&
                 Hero != Swap.GetHeroManager().GetActiveHero(Scene.PlayerOwner) &&
                 (Hero.ActivePlayer == none || Hero.ActivePlayer == Scene.PlayerOwner);
-            SetAPButtonEnabled(Swap.SwapButton, bVanillaAllowed &&
-                GetHeroBlockReason(Hero, false) == "", Scene.GetPlayerOwnerIndex());
+            SetAPButtonEnabled(Swap.SwapButton, bVanillaAllowed, Scene.GetPlayerOwnerIndex());
         }
         else if(Creation != none)
         {
@@ -392,12 +746,14 @@ function UpdateHeroMenuGuards()
 event Tick(float DeltaTime)
 {
     local APUnlockState CurrentState;
-    local array<DunDefUIScene> MessageScenes;
-    local DunDefUIScene MessageScene;
-    local string MessageTag;
+    local UI_MainMenu MainMenu;
+    local DunDefHeroManager Manager;
 
     if(!IsAPLocalSession())
         return;
+    // Suppress native grants before the parent viewport can run DLC checks.
+    class'APHeroSkins'.static.SilenceNativeAwards(GetMenuUnlockState(), class'Engine'.static.GetCurrentWorldInfo());
+    SuppressNativeUnlockPopups();
     super.Tick(DeltaTime);
     if(!IsAPLocalSession())
         return;
@@ -409,25 +765,57 @@ event Tick(float DeltaTime)
         bInstalledAPInputGuard = true;
     }
     CurrentState = GetMenuUnlockState();
+    if(ChaosStats == none) ChaosStats = new(self) class'APChaosStats';
+    ChaosStats.Apply(self,CurrentState);
+    if(DisplayRepair == none) DisplayRepair = new(self) class'APDisplayRepair';
+    DisplayRepair.Apply(self, CurrentState);
+    // Refresh native menu data without querying every costume entitlement
+    // every rendered frame. Confirmation still validates the exact costume.
+    APSkinRefreshDelay += DeltaTime;
+    if(APSkinRefreshDelay >= 0.5)
+    {
+        APSkinRefreshDelay = 0;
+        class'APHeroSkins'.static.Apply(CurrentState, self);
+    }
+    if(SeedPresentation == none) SeedPresentation = new(self) class'APSeedPresentation';
+    SeedPresentation.ApplyStartingCrystal(CurrentState);
     UpdateHeroMenuGuards();
+    UpdateAPShop();
 
-    // DD1 can bypass character selection when a seed already has a hero.
-    // Show the starting permissions after the initial UI has settled instead
-    // of tying the notice to one particular menu scene.
+    // Press Start establishes the input player. A modal shown over that screen
+    // can prevent it from completing, leaving its own OK button unusable.
+    // Wait for the actual main menu (not hero selection, which DD1 may skip).
     if(!bShowedAPStartingItems)
     {
         APStartupNoticeDelay += DeltaTime;
-        if(APStartupNoticeDelay >= 3.0 && CurrentState != none)
+        MainMenu = UI_MainMenu(GetActiveUISceneFromClass(class'UI_MainMenu'));
+        Manager = class'DunDefHeroManager'.static.GetHeroManager();
+        if(APStartupNoticeDelay >= 3.0 && CurrentState != none && CurrentState.SeedIdentity != "" &&
+            MainMenu != none && MainMenu.IsTopLevelScene() &&
+            MainMenu.TitleSceneTimer == 0 && MainMenu.SceneCloserTimer == -1 &&
+            GetActiveUISceneFromClass(class'UI_TitleScreen') == none &&
+            Manager != none && Manager.GetPrimaryPlayer() != none)
         {
             bShowedAPStartingItems = true;
+            if(SeedPresentation.ShouldShowNotice(CurrentState))
             class'DunDefSceneClient'.static.ShowDunDefMessageBox(
                 'APStartingItems',
                 "Archipelago Starting Items",
                 "Starting Hero: " $ CurrentState.GetStartingHeroDisplayName() $ "\n" $
                     "Starting Map: " $ CurrentState.GetStartingMapDisplayName(),
-                MBT_OK);
+                MBT_OK, Manager.GetPrimaryPlayer());
         }
     }
+
+    SuppressNativeUnlockPopups();
+}
+
+function SuppressNativeUnlockPopups()
+{
+    local array<DunDefUIScene> MessageScenes;
+    local DunDefUIScene MessageScene;
+    local string MessageTag;
+    local SoundCue NoticeSound;
 
     // A fresh DD1 save queues many owned-DLC mission/hero/costume popups.
     // They carry randomized tags with these stable prefixes. Suppress only
@@ -443,8 +831,27 @@ event Tick(float DeltaTime)
             Left(MessageTag, 12) == "UnlockedHero")
         {
             `log("AP:SUPPRESSED_DLC_UNLOCK_NOTICE tag=" $ MessageTag);
-            MessageScene.CloseScene();
+            // These notices were already hidden, but their opening/closing
+            // animation sound queues could still play. Do not mute other UI.
+            MessageScene.soundQueue.Length = 0;
+            MessageScene.soundsInQueue = false;
+            foreach MessageScene.SoundsToStopOnDeactivate(NoticeSound)
+            {
+                if(MessageScene.PlayerOwner != none && MessageScene.PlayerOwner.Actor != none)
+                    MessageScene.PlayerOwner.Actor.StopSound(NoticeSound, 0.0);
+            }
+            MessageScene.CloseScene(,,true);
         }
     }
 
+}
+
+defaultproperties
+{
+    // TC cooking does not reliably inherit the native DunDef config section.
+    // GetDefaultOptions reads these viewport defaults for each new profile.
+    Gamma=2.2
+    EnablePostProcessing=true
+    VolumeSFX=0.5
+    VolumeMusic=0.5
 }

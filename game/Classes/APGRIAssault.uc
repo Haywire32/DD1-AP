@@ -3,6 +3,28 @@ class APGRIAssault extends DunDefGRI_Assault;
 var int LastAPCompletedWave;
 var array<string> ReportedUnknownAPActions;
 
+function Server_AddGRIHeroAbilities(DunDefPlayerController PC)
+{
+    local APGameRuntime APGame;
+    super.Server_AddGRIHeroAbilities(PC);
+    if(WorldInfo.NetMode != NM_Standalone) return;
+    APGame=class'APGameRuntime'.static.GetForWorld(WorldInfo);
+    if(APGame != none) APGame.ApplyChaosLoadout(PC);
+}
+
+simulated function AddGRIActionWheelEntries(ActionWheel Wheel, out array<ActionWheelEntry> Entries)
+{
+    local APGameRuntime APGame;
+    local string Reason;
+    super.AddGRIActionWheelEntries(Wheel,Entries);
+    if(WorldInfo.NetMode != NM_Standalone) return;
+    APGame=class'APGameRuntime'.static.GetForWorld(WorldInfo);
+    if(APGame == none || APGame.UnlockState == none || !APGame.UnlockState.bChaosLoadouts) return;
+    if(APGame.ChaosRuntime == none || !APGame.ChaosRuntime.RemapWheel(Wheel,Entries,Reason))
+        `warn("AP:CHAOS_MENU_NOT_READY " $ Reason);
+}
+
+
 simulated function ShowAPLockedMessage(string Message)
 {
     local LinearColor LockedColor;
@@ -39,8 +61,8 @@ simulated function LoadMission(CampaignLevelEntryObject MissionObject)
             return;
         }
         if(HeroManager.CurrentGameSettings.InfiniteWaveMode &&
-            Left(MissionObject.MyLevelEntry.EntryIdentifierTag, 4) == "CAMP" &&
-            (APGame.UnlockState.ModeMask & 1) == 0)
+            Left(MissionObject.MyLevelEntry.EntryIdentifierTag, 4) != "SPEC" &&
+            !APGame.UnlockState.IsSurvivalUnlocked(MissionObject.MyLevelEntry.EntryIdentifierTag))
         {
             ShowAPLockedMessage("Archipelago: Survival mode is locked.");
             return;
@@ -119,6 +141,10 @@ simulated function bool CanPlaceTowerUnitCost(int Cost, DunDefPlayerController F
         APGame = class'APGameRuntime'.static.GetForWorld(WorldInfo);
         if(APGame != none && APGame.UnlockState != none)
         {
+            if(APGame.Traps != none && APGame.Traps.SkillJammed()) return false;
+            if(APGame.UnlockState.bChaosLoadouts)
+                return APGame.ChaosRuntime != none && APGame.ChaosRuntime.CanBuild(ForPlayer,TowerArchetype) &&
+                    super.CanPlaceTowerUnitCost(Cost,ForPlayer,TowerArchetype);
             DefenseKey = APGame.UnlockState.GetDefenseKey(TowerArchetype,
                 APGame.UnlockState.GetHeroKey(ForPlayer.GetHero()));
             if(DefenseKey == "")
@@ -169,11 +195,19 @@ simulated function bool ShouldDenyAPAbility(DunDefPlayerAbility Ability)
     }
 
     PC = Ability.GetPC();
+    if(APGame.Traps != none && APGame.Traps.DeniesAbility(Ability)) return true;
     if(!IsHeroAllowed(PC))
     {
         return true;
     }
     HeroKey = APGame.UnlockState.GetHeroKey(PC.GetHero());
+
+    if(APGame.UnlockState.bChaosLoadouts)
+    {
+        if(APGame.ChaosRuntime == none) return true;
+        if(APGame.ChaosRuntime.IsPreserved(PC,Ability)) return false;
+        return !APGame.ChaosRuntime.CanUse(Ability);
+    }
 
     BuildAbility = DunDefPlayerAbility_BuildTower(Ability);
     if(BuildAbility != none)

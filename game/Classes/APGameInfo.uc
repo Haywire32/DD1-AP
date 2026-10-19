@@ -1,6 +1,17 @@
 // Keep the native mission class in the inheritance chain.
 class APGameInfo extends main;
 
+// Native main spawns its controller archetype, not PlayerControllerClass.
+// GameInfo.Killed is called by Pawn.Died regardless of that controller class.
+function Killed(Controller Killer, Controller KilledPlayer, Pawn KilledPawn, class<DamageType> DamageType)
+{
+    local APGameRuntime Runtime;
+    Runtime = class'APGameRuntime'.static.GetForWorld(WorldInfo);
+    if(Runtime != none && Runtime.DeathLink != none)
+        Runtime.DeathLink.NotifyDeath(DunDefPlayerController(KilledPlayer), KilledPawn);
+    super.Killed(Killer, KilledPlayer, KilledPawn, DamageType);
+}
+
 event InitGame(string Options, out string ErrorMessage)
 {
     if(WorldInfo.NetMode != NM_Standalone)
@@ -9,6 +20,7 @@ event InitGame(string Options, out string ErrorMessage)
         ConsoleCommand("quit");
         return;
     }
+    class'APMapLoadCompatibility'.static.Restore(WorldInfo);
     super.InitGame(Options, ErrorMessage);
 }
 
@@ -54,6 +66,7 @@ function UpdateGlobalHeroModifiers(DunDefPlayerController PC)
 defaultproperties
 {
     PlayerControllerClass=class'APPlayerController'
+    HUDType=class'APHUD'
     GameReplicationInfoClass=class'APGameReplicationInfo'
 }
 
@@ -61,6 +74,13 @@ static event class<GameInfo> SetGameType(string MapName, string Options, string 
 {
     local class<GameInfo> Selected;
     Selected = super.SetGameType(MapName, Options, Portal);
+    class'APMapLoadCompatibility'.static.Prepare(MapName);
+    if(Selected == class'DunDefCrystalQuest.GameInfo_CrystalQuest')
+        return class'APGameShards';
+    if(Selected == class'DunDefCrystalQuest.GameInfo_Finale')
+        return class'APGameFinale';
+    if(Selected == class'GameInfo_MainSixPlayer')
+        return class'APGameSixPlayer';
     if(Selected == class'main')
         return class'APGameInfo';
     if(Selected == class'GameInfo_Special')
@@ -81,19 +101,29 @@ static event class<GameInfo> SetGameType(string MapName, string Options, string 
         return class'APGameAssault';
     if(Selected == class'DunDefSpecial.GameInfo_GoldenTokens')
         return class'APGameTreasure';
+    // Unknown native game types have no AP InitGame restore hook.
+    class'APMapLoadCompatibility'.static.Restore(class'Engine'.static.GetCurrentWorldInfo());
     return Selected;
 }
 
 function DoWaveSkipping(optional bool bAllowArbritraryWaveSkipping)
 {
-    local DunDefMapInfo Info;
-    if(class'DunDefHeroManager'.static.GetHeroManager().CurrentGameSettings.InfiniteWaveMode)
-    {
-        // The AP survival pack counts actual waves 1..N, never skipped waves.
-        StartWave = 1;
-        Info = DunDefMapInfo(WorldInfo.GetMapInfo());
-        if(Info != none)
-            Info.WaveToStartAt = 1;
-    }
+    local APGameRuntime Runtime;
+    Runtime = class'APGameRuntime'.static.GetForWorld(WorldInfo);
+    // The menu has validated AP and naturally-earned starting-wave limits.
+    // Allow its selection past vanilla's free-start cap in Survival only.
+    if(Runtime != none && Runtime.UnlockState != none && Runtime.UnlockState.SurvivalStartWave >= 1 &&
+        class'DunDefHeroManager'.static.GetHeroManager().CurrentGameSettings.InfiniteWaveMode)
+        bAllowArbritraryWaveSkipping = true;
     super.DoWaveSkipping(bAllowArbritraryWaveSkipping);
+}
+
+// Observe the native crystal-loss path before it changes the GRI to game-over.
+function ShowGameOver(int gameOverDescriptionReason)
+{
+    local APGameRuntime Runtime;
+    Runtime = class'APGameRuntime'.static.GetForWorld(WorldInfo);
+    if(Runtime != none && Runtime.DeathLink != none)
+        Runtime.DeathLink.NotifyGameOver(gameOverDescriptionReason);
+    super.ShowGameOver(gameOverDescriptionReason);
 }

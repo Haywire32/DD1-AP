@@ -55,7 +55,7 @@ I'd love feedback on design choices and bugs in the [Dungeon Defenders channel](
 
 
 ### AI disclosure
-I’ve used ChatGPT/Codex for the APWorld, UnrealScript code, game integration and debugging. Much of the code was written by AI under my direction.
+I have used ChatGPT/Codex for the APWorld, UnrealScript code, game integration and debugging. Much of the code was written by AI under my direction.
 
 I’ve also done a lot of manual work in the devkit DDDK. The gameplay design, options and balancing are directed by me, with feedback from players. I spend many hours playtesting, tweaking and retesting new features between updates.
 

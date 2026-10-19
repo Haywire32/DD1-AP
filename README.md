@@ -47,17 +47,12 @@ You can find the [download here](https://github.com/Haywire32/DD1-AP/releases)
    
 ### Play
 Open Archipelago Launcher, select Dungeon Defenders Client, and enter the
-server and slot. The game should launch automatically. 
+server and slot. On your first setup you must select your game folder.
 Choose Play Local; online play is intentionally disabled.
 
 # Feedback or questions
 I'd love feedback on design choices and bugs in the [Dungeon Defenders channel](https://discord.com/channels/731205301247803413/1328369703810240593) in the [Archipelago discord](https://discord.gg/8Z65BR2)
 
-The current version is still unstable and most likely has bugs.
-
-### Future plans and ideas
-- Game balance adjustments
-- More features
 
 ### AI disclosure
 I’ve used ChatGPT/Codex for the APWorld, UnrealScript code, game integration and debugging. Much of the code was written by AI under my direction.
